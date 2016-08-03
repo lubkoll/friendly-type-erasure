@@ -1,0 +1,7 @@
+#!/bin/bash
+
+
+HANDLE_FOLDER=handles
+mkdir -p $HANDLE_FOLDER
+python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$2 --interface-file $2 $1
+

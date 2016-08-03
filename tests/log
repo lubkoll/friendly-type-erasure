@@ -1,0 +1,30 @@
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/lars/Projects/spacy_type_erasure/tests/build
+Scanning dependencies of target unit_tests
+[ 12%] Building CXX object CMakeFiles/unit_tests.dir/sbo/test.cpp.o
+[ 25%] Building CXX object CMakeFiles/unit_tests.dir/sbo/heap_allocations.cpp.o
+[ 37%] Linking CXX executable unit_tests
+/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/libgtest.a(gtest-all.cc.o): In function `testing::internal::ThreadLocal<testing::TestPartResultReporterInterface*>::~ThreadLocal()':
+gtest-all.cc:(.text._ZN7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEED2Ev[_ZN7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEED5Ev]+0x25): undefined reference to `pthread_getspecific'
+gtest-all.cc:(.text._ZN7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEED2Ev[_ZN7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEED5Ev]+0x3a): undefined reference to `pthread_key_delete'
+/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/libgtest.a(gtest-all.cc.o): In function `testing::internal::ThreadLocal<std::vector<testing::internal::TraceInfo, std::allocator<testing::internal::TraceInfo> > >::~ThreadLocal()':
+gtest-all.cc:(.text._ZN7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEED2Ev[_ZN7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEED5Ev]+0x25): undefined reference to `pthread_getspecific'
+gtest-all.cc:(.text._ZN7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEED2Ev[_ZN7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEED5Ev]+0x3a): undefined reference to `pthread_key_delete'
+/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/libgtest.a(gtest-all.cc.o): In function `testing::internal::ThreadLocal<std::vector<testing::internal::TraceInfo, std::allocator<testing::internal::TraceInfo> > >::GetOrCreateValue() const':
+gtest-all.cc:(.text._ZNK7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEE16GetOrCreateValueEv[_ZNK7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEE16GetOrCreateValueEv]+0x27): undefined reference to `pthread_getspecific'
+gtest-all.cc:(.text._ZNK7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEE16GetOrCreateValueEv[_ZNK7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEE16GetOrCreateValueEv]+0x8b): undefined reference to `pthread_setspecific'
+/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/libgtest.a(gtest-all.cc.o): In function `testing::internal::ThreadLocal<testing::TestPartResultReporterInterface*>::CreateKey()':
+gtest-all.cc:(.text._ZN7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEE9CreateKeyEv[_ZN7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEE9CreateKeyEv]+0x25): undefined reference to `pthread_key_create'
+/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/libgtest.a(gtest-all.cc.o): In function `testing::internal::ThreadLocal<std::vector<testing::internal::TraceInfo, std::allocator<testing::internal::TraceInfo> > >::CreateKey()':
+gtest-all.cc:(.text._ZN7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEE9CreateKeyEv[_ZN7testing8internal11ThreadLocalISt6vectorINS0_9TraceInfoESaIS3_EEE9CreateKeyEv]+0x25): undefined reference to `pthread_key_create'
+/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib/libgtest.a(gtest-all.cc.o): In function `testing::internal::ThreadLocal<testing::TestPartResultReporterInterface*>::GetOrCreateValue() const':
+gtest-all.cc:(.text._ZNK7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEE16GetOrCreateValueEv[_ZNK7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEE16GetOrCreateValueEv]+0x25): undefined reference to `pthread_getspecific'
+gtest-all.cc:(.text._ZNK7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEE16GetOrCreateValueEv[_ZNK7testing8internal11ThreadLocalIPNS_31TestPartResultReporterInterfaceEE16GetOrCreateValueEv]+0x89): undefined reference to `pthread_setspecific'
+collect2: error: ld returned 1 exit status
+CMakeFiles/unit_tests.dir/build.make:251: recipe for target 'unit_tests' failed
+make[2]: *** [unit_tests] Error 1
+CMakeFiles/Makefile2:451: recipe for target 'CMakeFiles/unit_tests.dir/all' failed
+make[1]: *** [CMakeFiles/unit_tests.dir/all] Error 2
+Makefile:94: recipe for target 'all' failed
+make: *** [all] Error 2

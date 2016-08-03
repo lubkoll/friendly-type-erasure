@@ -1,0 +1,22 @@
+#!/bin/bash
+
+HANDLE_FOLDER=handles
+INTERFACE_FILE=interface.hh
+GIVEN_INTERFACE=plain_interface.hh
+
+#cd basic
+#mkdir -p $HANDLE_FOLDER
+#python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+#cd ..
+
+#cd cow
+#mkdir -p $HANDLE_FOLDER
+#python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py -cow --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+#cd ..
+
+cd sbo
+mkdir -p $HANDLE_FOLDER
+python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py -sbo --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+cd ..
+
+mkdir -p build && cd build && cmake .. && make && ./unit_tests
