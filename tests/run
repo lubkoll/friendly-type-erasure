@@ -4,19 +4,38 @@ HANDLE_FOLDER=handles
 INTERFACE_FILE=interface.hh
 GIVEN_INTERFACE=plain_interface.hh
 
-#cd basic
-#mkdir -p $HANDLE_FOLDER
-#python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
-#cd ..
+INTERFACE_FILE_CPP=${INTERFACE_FILE:0:`expr index "$INTERFACE_FILE" .hh`-1}.cpp
 
-#cd cow
-#mkdir -p $HANDLE_FOLDER
-#python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py -cow --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
-#cd ..
+echo $CWD
 
-cd sbo
-mkdir -p $HANDLE_FOLDER
-python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py -sbo --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+function prepare_test_case {
+  rm -rf $1 && mkdir $1
+  cp ../$1/* $1/
+  cd $1
+  ../../generate_given_interface $2 $GIVEN_INTERFACE
+  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $INTERFACE_FILE_CPP $GIVEN_INTERFACE
+  cd ..
+}
+
+# remove previously generate files
+rm -rf gen/ && mkdir gen
+cp util.hh gen/
+cp mock_fooable.hh gen/
+cd gen
+
+# generate type erased interfaces
+prepare_test_case basic Basic
+prepare_test_case basic_header_only BasicHeaderOnly
+
+prepare_test_case cow COW
+prepare_test_case cow_header_only COWHeaderOnly
+
+prepare_test_case sbo SBO
+prepare_test_case sbo_header_only SBOHeaderOnly
+
+prepare_test_case sbo_cow SBO_COW
+prepare_test_case sbo_cow_header_only SBO_COWHeaderOnly
 cd ..
 
-mkdir -p build && cd build && cmake .. && make && ./unit_tests
+# run unit tests
+rm -rf build && mkdir build && cd build && cmake .. && make && ./unit_tests && cd ..

@@ -13,6 +13,12 @@ from parser_addition import trim
 from parser_addition import extract_comments
 from parser_addition import extract_includes
 from util import *
+from file_writer import HeaderOnlyInterfaceFileWriter
+from file_writer import InterfaceFileWriter
+from file_writer import InterfaceHeaderFileWriter
+from file_writer import InterfaceSourceFileWriter
+from file_writer import get_source_filename
+from file_parser import GenericFileParser
 
 
 def add_arguments(parser):
@@ -23,6 +29,14 @@ def add_arguments(parser):
 #                        help='form used to generate code for the type-erased interface (constructors, assignment operators, ...)')
     parser.add_argument('--headers', type=str, required=False,
                         help='file containing headers to prepend to the generated code')
+    parser.add_argument('--header-only', action='store_true',
+                        help='disables generation of source files')
+    parser.add_argument('--buffer', nargs='?', type=str, required=False,
+                        default='128',
+                        help='buffer size or c++-macro specifying the buffer size')
+    parser.add_argument('-sbo', '--small-buffer-optimization', nargs='?', type=bool, required=False,
+                        const=True, default=False,
+                        help='enables small buffer optimization')
 
 
 def create_parser():
@@ -34,10 +48,15 @@ def create_parser():
 
 def parse_additional_args(args, data):
     data.interface_file = args.interface_file
-    data.interface_form = prepare_form(open(args.interface_form).read())
     data.interface_form_lines = prepare_form(open(args.interface_form).readlines())
     data.headers = args.headers and open(args.headers).read() or ''
     data.copy_on_write = args.copy_on_write
+    data.header_only = args.header_only
+    data.buffer = args.buffer
+    data.small_buffer_optimization = args.small_buffer_optimization
+    if not data.header_only:
+        data.interface_cpp_form_lines = prepare_form(open(args.interface_form.replace('.hpp','.cpp')).readlines())
+
     return data
 
 
@@ -45,236 +64,35 @@ def parse_args(args):
     data = client_data()
     data = parse_default_args(args, data)
     data = parse_additional_args(args, data)
-    data = parse_file(args, data)
+    data.buffer = args.buffer
     return data
 
 
-def member_params (data,cursor):
-    tokens = get_tokens(data.tu, cursor)
-
-    open_brace = '{'
-    semicolon = ';'
-    close_paren = ')'
-    const_token = 'const'
-    comma = ','
-
-    str = ''
-    constness = ''
-
-    identifier_regex = re.compile(r'[_a-zA-Z][_a-zA-Z0-9]*')
-
-    probably_args = []
-    close_paren_seen = False
-    for i in range(len(tokens)):
-        spelling = tokens[i].spelling
-        if identifier_regex.match(spelling) and i < len(tokens) - 1 and (tokens[i + 1].spelling == comma or tokens[i + 1].spelling == close_paren):
-            probably_args.append(spelling)
-        if close_paren_seen and spelling == const_token:
-            constness = 'const'
-        if spelling == close_paren:
-            close_paren_seen = True
-        if spelling == open_brace or spelling == semicolon:
-            break
-        if i:
-            str += ' '
-        str += spelling
-
-    args = [x for x in cursor.get_arguments()]
-    args_str = ''
-
-    function_name = cursor.spelling
-
-    for i in range(len(args)):
-        arg_cursor = args[i]
-        # Sometimes, libclang gets confused.  When it does, try our best to
-        # figure out the parameter names anyway.
-        if arg_cursor.spelling == '':
-            args_str = ', '.join(probably_args)
-            os.write(2,
-'''An error has occurred in determining the name of parameter {} of function
-{}. This usually occurs when libclang can't figure out the type of the
-parameter (often due to a typo or missing include somewhere).  We're using
-these possibly-wrong, heuristically-determined parameter names instead:
-'{}'.\n'''.format(i, function_name, args_str))
-            break
-        if i:
-            args_str += ', '
-        args_str += arg_cursor.spelling
-
-    return_str = cursor.result_type.kind != TypeKind.VOID and 'return ' or ''
-
-    return [str, args_str, return_str, function_name, constness]
+def get_filewriter(data, indentation, comments):
+    if data.header_only:
+        return HeaderOnlyInterfaceFileWriter(data.interface_file, indentation, data.handle_namespace, comments)
+    return InterfaceFileWriter(data.interface_file, get_source_filename(data.interface_file), indentation, data.handle_namespace, comments)
 
 
-def find_expansion_lines (lines):
-    retval = [0] * 3
-    for i in range(len(lines)):
-        line = lines[i]
-        try:
-            nonvirtual_pos = line.index('{nonvirtual_members}')
-        except:
-            nonvirtual_pos = -1
-        try:
-            pure_virtual_pos = line.index('{pure_virtual_members}')
-        except:
-            pure_virtual_pos = -1
-        try:
-            virtual_pos = line.index('{virtual_members}')
-        except:
-            virtual_pos = -1
-        if nonvirtual_pos != -1:
-            retval[0] = (i, nonvirtual_pos)
-        elif pure_virtual_pos != -1:
-            retval[1] = (i, pure_virtual_pos)
-        elif virtual_pos != -1:
-            retval[2] = (i, virtual_pos)
-    return retval
-
-def close_struct (data, comments, indentation):
-    lines = data.interface_form_lines
-
-    expansion_lines = find_expansion_lines(lines)
-    class_indent = ''
-    base_indent = class_indent + indentation
-    indent = base_indent + indentation
-
-    comment = get_comment(class_indent,comments,data.current_struct_prefix).rstrip('\n\r')
-    
-    lines = map(
-        lambda line: line.format(
-            struct_prefix=comment + data.current_struct_prefix,
-            struct_name=data.current_struct.spelling,
-            nonvirtual_members='{nonvirtual_members}',
-        ),
-        lines
-    )
-
-    nonvirtual_members = ''
-
-    for function in data.member_functions:
-        nonvirtual_members += get_comment(base_indent, comments, function[0])
-        nonvirtual_members += \
-            base_indent + function[0] + '\n' + \
-            base_indent + '{\n' + \
-            indent + 'assert(handle_);\n' + \
-            indent + function[2]
-        if data.copy_on_write:
-            nonvirtual_members += ( function[4] == 'const' and 'read().' or 'write().')
-        else:
-            nonvirtual_members += 'handle_->'
-        nonvirtual_members += function[3] + '(' + function[1] + ' );\n' + \
-            base_indent + '}\n'
-        if not function is data.member_functions[-1]:
-            nonvirtual_members += '\n'
-
-    nonvirtual_members = nonvirtual_members[:-1]
-
-    lines[expansion_lines[0][0]] = nonvirtual_members
-
-    return lines
-
-
-
-def write_interface_to_file_impl (data, file, cursor, parent, comments, indentation):
-    try:
-        kind = cursor.kind
-    except:
-        return child_visit.Break
-
-    indent = ''
-    # close open namespaces we have left
-    enclosing_namespace = parent
-    while enclosing_namespace != data.tu.cursor and not is_namespace(enclosing_namespace.kind):
-        enclosing_namespace = enclosing_namespace.semantic_parent
-
-    if enclosing_namespace != data.tu.cursor and is_namespace(enclosing_namespace.kind):
-        while len(data.current_namespaces) and \
-              enclosing_namespace != data.current_namespaces[-1]:
-            data.current_namespaces.pop()
-            close_namespace(file, indent)
-            indent *= 0
-            indent += (len(data.current_namespaces) - 1) * indentation
-
-    # close open struct if we have left it
-    enclosing_struct = parent
-    while enclosing_struct and \
-          enclosing_struct != data.tu.cursor and \
-          not is_class(enclosing_struct.kind):
-        enclosing_struct = enclosing_struct.semantic_parent
-
-    if enclosing_struct and \
-       data.current_struct != clang.cindex.conf.lib.clang_getNullCursor() and \
-       enclosing_struct != data.current_struct:
-        close_struct(data,comments,indentation)
-        data.current_struct = clang.cindex.conf.lib.clang_getNullCursor()
-        data.member_functions = []
-
-    location = cursor.location
-    from_main_file_ = clang.cindex.conf.lib.clang_Location_isFromMainFile(location)
-
-    kind = cursor.kind
-    if is_namespace(kind):
-        if from_main_file_:
-            open_namespace(file, cursor.spelling, indent)
-            data.current_namespaces.append(cursor)
-            indent *= 0
-            indent += (len(data.current_namespaces) - 1) * indentation
-        return child_visit.Recurse
-    elif not from_main_file_:
-        return child_visit.Continue
-    elif is_class(kind):
-        if data.current_struct == clang.cindex.conf.lib.clang_getNullCursor():
-            data.current_struct = cursor
-            data.current_struct_prefix = class_prefix(data.tu,cursor)
-            return child_visit.Recurse
-    elif is_function(kind):
-        data.member_functions.append(member_params(data,cursor))
-
-    return child_visit.Continue
-
-
-def write_interface_to_file (data, file, cursor, comments, indentation):
-    for child in cursor.get_children():
-        result = write_interface_to_file_impl(data, file, child, cursor, comments, indentation)
-        if result == child_visit.Recurse:
-            if write_interface_to_file(data, file, child, comments, indentation) == child_visit.Break:
-                return child_visit.Break
-        elif result == child_visit.Break:
-            return child_visit.Break
-        elif result == child_visit.Continue:
-            continue
-
-
-def write_file(args, indentation, impl_namespace_name=''):
-
+def write_file(args, indentation):
+    if args.header_only:
+        args.interface_form = args.interface_form.replace('.hpp','_header_only.hpp')
     data = parse_args(args)
-    comments = extract_comments(data.filename)
-    interface_headers = extract_includes(data.filename)
+    comments = extract_comments(data.file)
 
-    file = open(args.interface_file,'w')
-    include_guard = add_include_guard(file,data.filename,comments)
-    add_headers(file,interface_headers)
-    file.write('#include "' + args.handle_file + '"\n\n')
+    interface_headers = extract_includes(data.file)
+    interface_headers.append('#include "' + args.handle_file + '"')
 
-    write_interface_to_file(data, file, data.tu.cursor, comments, indentation)
+    file_writer = get_filewriter(data, indentation, comments)
+    file_writer.process_open_include_guard(args.file)
+    file_writer.process_headers(interface_headers)
 
-    if data.current_struct != clang.cindex.conf.lib.clang_getNullCursor():
-        code = close_struct(data,comments,indentation)
+    file_parser = GenericFileParser(file_writer,data)
+    file_parser.parse()
 
-    base_indent = len(data.current_namespaces) * indentation
-    for entry in code:
-        lines = entry.split('\n')
-        for line in lines:
-            if impl_namespace_name != '':
-                line = line.replace(' Handle', ' ' + impl_namespace_name + '::Handle')
-                line = line.replace('(Handle', '(' + impl_namespace_name + '::Handle')
-                line = line.replace('<Handle', '<' + impl_namespace_name + '::Handle')
-            file.write(base_indent + line + '\n')
+    file_writer.process_close_include_guard()
+    file_writer.write_to_file()
 
-    close_namespaces(file, data, indentation)
-    close_include_guard(file, include_guard)
-    file.write('\n')
-    file.close()
 
 # main
 if __name__ == "__main__":

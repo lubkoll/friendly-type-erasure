@@ -15,6 +15,14 @@ const_token = 'const'
 comma = ','
 
 
+def trim(string):
+    return string.strip(' \n\r\t')
+
+
+def rtrim(string):
+    return string.rstrip(' \n\r\t')
+
+
 class client_data:
     def __init__(self):
         self.tu = None
@@ -30,6 +38,7 @@ class client_data:
         self.non_copyable = False
         self. indent = ''
         self.impl_ending = ''
+        self.current_cursor = None
 
 
 def is_class(kind):
@@ -66,15 +75,11 @@ def class_prefix(translation_unit, class_cursor):
     retval = ''
     tokens = get_tokens(translation_unit, class_cursor)
     open_brace = '{'
-    struct_ = 'struct'
-    class_ = 'class'
 
     for i in range(len(tokens)):
         spelling = tokens[i].spelling
         if spelling == open_brace:
             break
-        if spelling == struct_ or spelling == class_:
-            retval += '\n'
         elif i:
             retval += ' '
         retval += spelling
@@ -97,6 +102,7 @@ def prepare_form (form):
             form[i] = prepare_form_impl(form[i])
         return \
             form
+
 
 def print_diagnostic(diag):
     severities = ['ignored', 'note', 'warning', 'error', 'fatal error']
@@ -132,49 +138,10 @@ def same_signature(function, other_function):
     return unify_signature(function) == unify_signature(other_function)
 
 
-def add_include_guard(file, filename, comments=None):
-    include_guard = extract_include_guard(filename)
-    if include_guard == None:
-        return ''
-    if comments != None:
-        if trim(include_guard) == '#pragma once':
-            copyright = get_comment('', comments, include_guard)
-        else:
-            copyright = get_comment('', comments, include_guard[0])
-        if copyright != '':
-            file.write(copyright)
-    file.write(include_guard)
-    return include_guard
-
-
-def close_include_guard(file, include_guard):
-    trimmed_guard = trim(include_guard)
-    if trimmed_guard != '#pragma once' and trimmed_guard != '':
-        file.write('\n#endif')
-
-
-def add_headers(file, headers ):
-    for header in headers:
-        file.write(header)
-    if len(headers) > 0:
-        file.write('\n')
-
-
-def open_namespace(file, namespace_, indent):
-    name = 'namespace ' + namespace_
-    file.write(indent + name + '\n' + indent + '{')
-
-
-def close_namespace(file,indent):
-    file.write(indent + '}\n')
-
-
-def close_namespaces(file, data, indentation):
-    indent = (len(data.current_namespaces) - 1) * indentation
+def close_namespaces(file_writer, data):
     while len(data.current_namespaces):
         data.current_namespaces.pop()
-        close_namespace(file, indent)
-        indent = (len(data.current_namespaces) - 1) * indentation
+        file_writer.process_close_namespace()
 
 
 def indent_lines(lines, data, indent):
@@ -201,12 +168,9 @@ def add_default_arguments(parser):
     parser.add_argument('--indent', nargs='?', type=int,
                         const=4, default=4,
                         help='number of spaces for indentation')
-#    parser.add_argument('--outer_namespaces', nargs='?', type=int,
-#                        const=0, default=0,
-#                        help='number of spaces for indentation')
-    parser.add_argument('--impl', nargs='?', type=str,
-                        const='_impl', default='_impl',
-                        help='ending for namespace containing the handle implementation')
+    parser.add_argument('--handle-extension', nargs='?', type=str,
+                        default='Handles',
+                        help='ending for namespace containing the handle implementation (not considered if --handle-namespace is specified)')
     parser.add_argument('--clang-path', type=str, required=False,
                         default='/usr/lib/llvm-3.8/lib',
                         help='path to libclang library')
@@ -214,25 +178,18 @@ def add_default_arguments(parser):
                         default='-std=c++11',
                         help='additional args to pass to Clang')
     parser.add_argument('file', type=str, help='the input file containing archetypes')
+    parser.add_argument('--handle-namespace', nargs='?', type=str, required=False,
+                        default='',
+                        help='namespace containing the handle implementations')
 
 
 def parse_default_args(args, data):
     data.non_copyable = args.non_copyable
     data.indent = args.indent
-#    data.outer_namespaces = args.outer_namespaces
-    data.impl_ending = args.impl
+    data.handle_extension = args.handle_extension
+    data.handle_namespace = args.handle_namespace
+    data.file = args.file
+    data.clang_args = args.clang_args
     return data
-
-
-def parse_file(args, data):
-    all_clang_args = [args.file]
-    all_clang_args.extend(args.clang_args)
-
-    index = clang.cindex.Index.create()
-    data.tu = index.parse(None, all_clang_args, options=TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
-    data.filename = data.tu.spelling
-
-    if data.filename == '':
-        exit(1)
 
     return data

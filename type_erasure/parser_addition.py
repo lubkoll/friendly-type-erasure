@@ -136,7 +136,7 @@ def extract_includes(filename):
         if not line: break
         line = ltrim(line)
         if line.startswith('#include '):
-            includes.append(line)
+            includes.append(trim(line))
         
 
     file.close()

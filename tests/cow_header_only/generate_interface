@@ -1,0 +1,13 @@
+#!/bin/bash
+
+HANDLE_FOLDER=$1
+INTERFACE_FILE=$2
+INTERFACE_FILE_CPP=$3
+GIVEN_INTERFACE=$4
+
+rm -rf $HANDLE_FOLDER 
+mkdir $HANDLE_FOLDER
+rm -f $INTERFACE_FILE
+rm -f $INTERFACE_FILE_CPP
+python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py --header-only -cow --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+

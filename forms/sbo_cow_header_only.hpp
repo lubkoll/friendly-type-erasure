@@ -20,9 +20,24 @@ public:
         handle_ = type_erasure_detail::clone_impl< HandleBase<Buffer>, StackAllocatedHandle<PlainT>, HeapAllocatedHandle<PlainT> >( std::forward<T>(impl), buffer_ );
     }
 
-    %struct_name% ( const %struct_name%& other );
+    %struct_name% ( const %struct_name%& other ) :
+        handle_ (
+            !other.handle_ || type_erasure_detail::heap_allocated( other.handle_, other.buffer_ ) ?
+            other.handle_ :
+            type_erasure_detail::handle_ptr< HandleBase<Buffer> >(
+                type_erasure_detail::char_ptr( &buffer_ ) + type_erasure_detail::handle_offset( other.handle_, other.buffer_ )
+            )
+        ),
+        buffer_ ( other.buffer_)
+    {
+        if ( handle_ )
+            handle_->add_ref( );
+    }
 
-    %struct_name% ( %struct_name%&& other ) noexcept;
+    %struct_name% ( %struct_name%&& other ) noexcept
+    {
+        swap( other.handle_, other.buffer_ );
+    }
 
     // Assignments
     template <typename T,
@@ -37,17 +52,35 @@ public:
         return *this;
     }
 
-    %struct_name%& operator= ( const %struct_name%& other );
+    %struct_name%& operator= ( const %struct_name%& other )
+    {
+        %struct_name% temp( other );
+        swap( temp.handle_, temp.buffer_ );
+        if ( handle_ )
+            handle_->add_ref( );
+        return *this;
+    }
 
-    %struct_name%& operator= ( %struct_name%&& other ) noexcept;
+    %struct_name%& operator= ( %struct_name%&& other ) noexcept
+    {
+        %struct_name% temp( std::move( other ) );
+        swap( temp.handle_, temp.buffer_ );
+        return *this;
+    }
 
-    ~%struct_name% ();
+    ~%struct_name% ()
+    {
+        reset();
+    }
 
     /**
      * @brief Checks if the type-erased interface holds an implementation.
      * @return true if an implementation is stored, else false
      */
-    explicit operator bool( ) const;
+    explicit operator bool( ) const
+    {
+        return handle_ != nullptr;
+    }
 
     /**
      * @brief Conversion of the stored implementation to @code T*@endcode.
@@ -104,13 +137,50 @@ public:
     %nonvirtual_members%
 
 private:
-    void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer );
+    void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer )
+    {
+        using namespace type_erasure_detail;
+        const bool this_heap_allocated = heap_allocated( handle_, buffer_ );
+        const bool other_heap_allocated = heap_allocated( other_handle, other_buffer );
 
-    void reset ( );
+        if ( this_heap_allocated && other_heap_allocated ) {
+            std::swap( handle_, other_handle );
+        } else if ( this_heap_allocated ) {
+            const std::ptrdiff_t offset = handle_offset( other_handle, other_buffer );
+            other_handle = handle_;
+            buffer_ = other_buffer;
+            handle_ = handle_ptr< HandleBase<Buffer> >( char_ptr(&buffer_) + offset );
+        } else if ( other_heap_allocated ) {
+            const std::ptrdiff_t offset = handle_offset( handle_, buffer_ );
+            handle_ = other_handle;
+            other_buffer = buffer_;
+            other_handle = handle_ptr< HandleBase<Buffer> >( char_ptr(&other_buffer) + offset );
+        } else {
+            const std::ptrdiff_t this_offset = handle_offset( handle_, buffer_ );
+            const std::ptrdiff_t other_offset = handle_offset( other_handle, other_buffer );
+            std::swap( buffer_, other_buffer );
+            handle_ = handle_ptr< HandleBase<Buffer> >( char_ptr(&buffer_) + this_offset );
+            other_handle = handle_ptr< HandleBase<Buffer> >( char_ptr(&other_buffer) + other_offset );
+        }
+    }
 
-    const HandleBase<Buffer>& read ( ) const;
+    void reset ( )
+    {
+        if ( handle_ )
+            handle_->destroy( );
+    }
 
-    HandleBase<Buffer> & write ( );
+    const HandleBase<Buffer>& read ( ) const
+    {
+        return *handle_;
+    }
+
+    HandleBase<Buffer> & write ( )
+    {
+        if ( !handle_->unique( ) )
+            handle_ = handle_->clone_into( buffer_ );
+        return *handle_;
+    }
 
     HandleBase<Buffer>* handle_ = nullptr;
     Buffer buffer_;

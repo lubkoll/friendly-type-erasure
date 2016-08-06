@@ -1,3 +1,0 @@
-mkdir -p handles
-python2 ../../type_erase.py plain_interface.hh
-

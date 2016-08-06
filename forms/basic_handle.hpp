@@ -1,5 +1,3 @@
-#pragma once
-
 namespace %namespace_prefix%
 {
     struct HandleBase
@@ -15,7 +13,7 @@ namespace %namespace_prefix%
     {
         template <typename U,
                   typename std::enable_if< std::is_same< typename std::remove_const<T>::type, 
-	                                                 typename std::decay<U>::type& >::value >::type* = nullptr >
+                                                         typename std::decay<U>::type& >::value >::type* = nullptr >
         explicit Handle( U&& value ) noexcept
             : value_( std::forward<U>(value) )
         {}
@@ -23,7 +21,7 @@ namespace %namespace_prefix%
         template <typename U,
                   typename std::enable_if< std::is_same< T, typename std::decay<U>::type >::value >::type* = nullptr >
         explicit Handle( U&& value ) noexcept ( std::is_rvalue_reference< decltype(value) >::value &&
-                                                std::is_nothrow_move_constructible<typename std::decay<U>::type>::value )
+                                                std::is_nothrow_move_constructible< typename std::decay<U>::type >::value )
             : value_( std::forward<U>(value) )
         {}
 
@@ -46,4 +44,3 @@ namespace %namespace_prefix%
         {}
     };
 }
-

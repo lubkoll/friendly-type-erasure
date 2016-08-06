@@ -4,12 +4,9 @@
 #include "../mock_fooable.hh"
 #include "../util.hh"
 
-namespace
-{
-    using SBOCOW::Fooable;
-    using Mock::MockFooable;
-    using Mock::MockLargeFooable;
-}
+using SBO_COW::Fooable;
+using Mock::MockFooable;
+using Mock::MockLargeFooable;
 
 TEST( TestSBOCOWFooable_HeapAllocations, Empty )
 {

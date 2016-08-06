@@ -4,11 +4,14 @@
 #include "../mock_fooable.hh"
 #include "../util.hh"
 
-using SBO::Fooable;
-using Mock::MockFooable;
-using Mock::MockLargeFooable;
+namespace
+{
+    using SBOHeaderOnly::Fooable;
+    using Mock::MockFooable;
+    using Mock::MockLargeFooable;
+}
 
-TEST( TestSBOFooable_HeapAllocations, Empty )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, Empty )
 {
     auto expected_heap_allocations = 0u;
 
@@ -30,7 +33,7 @@ TEST( TestSBOFooable_HeapAllocations, Empty )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyFromValue_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyFromValue_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -39,7 +42,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyFromValue_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyConstruction_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyConstruction_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -48,7 +51,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyConstruction_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyFromValueWithReferenceWrapper_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyFromValueWithReferenceWrapper_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -57,7 +60,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyFromValueWithReferenceWrapper_SmallObj
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveFromValue_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveFromValue_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -66,7 +69,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveFromValue_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveConstruction_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveConstruction_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -75,7 +78,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveConstruction_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveFromValueWithReferenceWrapper_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveFromValueWithReferenceWrapper_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -84,7 +87,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveFromValueWithReferenceWrapper_SmallObj
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValue_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyAssignFromValue_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -94,7 +97,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValue_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyAssignment_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyAssignment_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -104,7 +107,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyAssignment_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValuenWithReferenceWrapper_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyAssignFromValuenWithReferenceWrapper_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -114,7 +117,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValuenWithReferenceWrapper_S
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValue_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveAssignFromValue_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -124,7 +127,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValue_SmallObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveAssignment_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveAssignment_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -135,7 +138,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveAssignment_SmallObject )
 }
 
 
-TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValueWithReferenceWrapper_SmallObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveAssignFromValueWithReferenceWrapper_SmallObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -146,7 +149,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValueWithReferenceWrapper_Sm
 }
 
 
-TEST( TestSBOFooable_HeapAllocations, CopyFromValue_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyFromValue_LargeObject )
 {
     auto expected_heap_allocations = 1u;
 
@@ -155,7 +158,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyFromValue_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyConstruction_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyConstruction_LargeObject )
 {
     auto expected_heap_allocations = 1u;
 
@@ -164,7 +167,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyConstruction_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyFromValueWithReferenceWrapper_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyFromValueWithReferenceWrapper_LargeObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -173,7 +176,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyFromValueWithReferenceWrapper_LargeObj
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveFromValue_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveFromValue_LargeObject )
 {
     auto expected_heap_allocations = 1u;
 
@@ -182,7 +185,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveFromValue_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveConstruction_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveConstruction_LargeObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -191,7 +194,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveConstruction_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveFromValueWithReferenceWrapper_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveFromValueWithReferenceWrapper_LargeObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -200,7 +203,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveFromValueWithReferenceWrapper_LargeObj
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValue_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyAssignFromValue_LargeObject )
 {
     auto expected_heap_allocations = 1u;
 
@@ -210,7 +213,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValue_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyAssignment_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyAssignment_LargeObject )
 {
     auto expected_heap_allocations = 1u;
 
@@ -220,7 +223,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyAssignment_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValuenWithReferenceWrapper_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, CopyAssignFromValuenWithReferenceWrapper_LargeObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -230,7 +233,7 @@ TEST( TestSBOFooable_HeapAllocations, CopyAssignFromValuenWithReferenceWrapper_L
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValue_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveAssignFromValue_LargeObject )
 {
     auto expected_heap_allocations = 1u;
 
@@ -240,7 +243,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValue_LargeObject )
                       expected_heap_allocations );
 }
 
-TEST( TestSBOFooable_HeapAllocations, MoveAssignment_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveAssignment_LargeObject )
 {
     auto expected_heap_allocations = 0u;
 
@@ -251,7 +254,7 @@ TEST( TestSBOFooable_HeapAllocations, MoveAssignment_LargeObject )
 }
 
 
-TEST( TestSBOFooable_HeapAllocations, MoveAssignFromValueWithReferenceWrapper_LargeObject )
+TEST( TestHeaderOnlySBOFooable_HeapAllocations, MoveAssignFromValueWithReferenceWrapper_LargeObject )
 {
     auto expected_heap_allocations = 0u;
 

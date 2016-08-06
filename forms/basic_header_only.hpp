@@ -10,15 +10,19 @@ public:
                   >::type* = nullptr>
     %struct_name%( T&& value ) :
         handle_ (
-            new Handle< typename std::decay<T>::type >(
+            new Handle<typename std::decay<T>::type>(
                 std::forward<T>( value )
             )
         )
     {}
 
-    %struct_name%( const %struct_name% & rhs );
+    %struct_name%( const %struct_name% & rhs )
+        : handle_ ( rhs.handle_ ? rhs.handle_->clone() : nullptr )
+    {}
 
-    %struct_name%( %struct_name%&& rhs ) noexcept;
+    %struct_name%( %struct_name%&& rhs ) noexcept
+        : handle_ ( std::move(rhs.handle_) )
+    {}
 
     // Assignment
     template <typename T,
@@ -28,19 +32,31 @@ public:
     %struct_name%& operator=( T&& value )
     {
         %struct_name% temp( std::forward<T>( value ) );
-        std::swap(temp, *this);
+        std::swap( temp, *this );
         return *this;
     }
 
-    %struct_name%& operator=( const %struct_name%& rhs );
+    %struct_name%& operator=( const %struct_name%& rhs )
+    {
+        %struct_name% temp( rhs );
+        std::swap( temp, *this );
+        return *this;
+    }
 
-    %struct_name%& operator=( %struct_name%&& rhs ) noexcept;
+    %struct_name%& operator=( %struct_name%&& rhs ) noexcept
+    {
+        handle_ = std::move( rhs.handle_ );
+        return *this;
+    }
 
     /**
      * @brief Checks if the type-erased interface holds an implementation.
      * @return true if an implementation is stored, else false
      */
-    explicit operator bool( ) const noexcept;
+    explicit operator bool( ) const noexcept
+    {
+        return handle_ != nullptr;
+    }
 
     /**
      * @brief Conversion of the stored implementation to @code T*@endcode.

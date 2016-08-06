@@ -7,7 +7,7 @@
 namespace type_erasure_detail
 {    
     template <class T, class Derived, class Base>
-    T* cast(Base* base) noexcept
+    inline T* cast ( Base* base ) noexcept
     {
         assert(base);
         auto derived = dynamic_cast<Derived*>(base);
@@ -18,7 +18,7 @@ namespace type_erasure_detail
 
 
     template <class BufferHandle, class Buffer>
-    void* get_buffer_ptr(Buffer& buffer)
+    inline void* get_buffer_ptr ( Buffer& buffer )
     {
         void* buffer_ptr = &buffer;
         auto buffer_size = sizeof(buffer);
@@ -33,7 +33,7 @@ namespace type_erasure_detail
               class StackAllocatedHandle,
               class HeapAllocatedHandle,
               typename T, typename Buffer>
-    HandleBase* clone_impl (T&& value, Buffer& buffer)
+    inline HandleBase* clone_impl ( T&& value, Buffer& buffer )
     {
         using PlainType = typename std::decay<T>::type;
 
@@ -47,21 +47,41 @@ namespace type_erasure_detail
     }
 
     template <typename T>
-    inline unsigned char* char_ptr (T* ptr) noexcept
+    inline unsigned char* char_ptr ( T* ptr ) noexcept
     {
-        return static_cast<unsigned char*>(static_cast<void*>(ptr));
+        return static_cast<unsigned char*>( static_cast<void*>( ptr ) );
+    }
+
+    template <typename T>
+    inline const unsigned char* char_ptr( const T* ptr ) noexcept
+    {
+        return static_cast<const unsigned char*>( static_cast<const void*>( ptr ) );
     }
 
     template <class HandleBase>
-    inline HandleBase* handle_ptr (unsigned char* ptr) noexcept
+    inline HandleBase* handle_ptr ( unsigned char* ptr ) noexcept
     {
         return static_cast<HandleBase*>(static_cast<void*>(ptr));
     }
 
+    template <class HandleBase>
+    inline const HandleBase* handle_ptr( const unsigned char* ptr ) noexcept
+    {
+        return static_cast<const HandleBase*>( static_cast<const void*>(ptr) );
+    }
+
     template <class HandleBase, class Buffer>
-    inline std::ptrdiff_t handle_offset (HandleBase* handle, Buffer& buffer) noexcept
+    inline std::ptrdiff_t handle_offset ( HandleBase* handle, Buffer& buffer ) noexcept
     {
         assert(handle);
         return char_ptr(handle) - char_ptr(&buffer);
     }
+
+    template <class HandleBase, class Buffer>
+    inline bool heap_allocated ( const HandleBase* handle, const Buffer& buffer ) noexcept
+    {
+        return handle < handle_ptr<HandleBase>( char_ptr(&buffer) ) ||
+               handle_ptr<HandleBase>( char_ptr(&buffer) + sizeof(buffer) ) <= handle;
+    }
+
 }
