@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    %struct_name% () = default;
+    constexpr %struct_name% () = default;
 
     template <typename T,
               typename std::enable_if<
