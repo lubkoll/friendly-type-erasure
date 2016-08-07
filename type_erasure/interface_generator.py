@@ -18,6 +18,8 @@ from file_writer import InterfaceFileWriter
 from file_writer import InterfaceHeaderFileWriter
 from file_writer import InterfaceSourceFileWriter
 from file_writer import get_source_filename
+from file_writer import HeaderOnlyVTableInterfaceFileWriter
+from file_writer import VTableInterfaceFileWriter
 from file_parser import GenericFileParser
 
 
@@ -69,9 +71,14 @@ def parse_args(args):
 
 
 def get_filewriter(data, indentation, comments):
-    if data.header_only:
-        return HeaderOnlyInterfaceFileWriter(data.interface_file, indentation, data.handle_namespace, comments)
-    return InterfaceFileWriter(data.interface_file, get_source_filename(data.interface_file), indentation, data.handle_namespace, comments)
+    if data.vtable:
+        if data.header_only:
+            return HeaderOnlyVTableInterfaceFileWriter(data.interface_file, indentation, data.handle_namespace, comments)
+        return VTableInterfaceFileWriter(data.interface_file, get_source_filename(data.interface_file), indentation, data.handle_namespace, comments)
+    else:
+        if data.header_only:
+            return HeaderOnlyInterfaceFileWriter(data.interface_file, indentation, data.handle_namespace, comments)
+        return InterfaceFileWriter(data.interface_file, get_source_filename(data.interface_file), indentation, data.handle_namespace, comments)
 
 
 def write_file(args, indentation):

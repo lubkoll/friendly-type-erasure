@@ -28,6 +28,38 @@ def find_expansion_lines_for_handle_file_writer(lines):
             retval[2] = (i, virtual_pos)
     return retval
 
+
+def find_expansion_lines_for_vtable_execution_wrapper_file_writer(lines):
+    retval = [0] * 4
+    for i in range(len(lines)):
+        line = lines[i]
+        try:
+            member_functions_pos = line.index('{member_functions}')
+        except:
+            member_functions_pos = -1
+        try:
+            reference_wrapped_member_functions_pos = line.index('{reference_wrapped_member_functions}')
+        except:
+            reference_wrapped_member_functions_pos = -1
+        try:
+            member_function_pointers_pos = line.index('{member_function_pointers}')
+        except:
+            member_function_pointers_pos = -1
+        try:
+            member_function_signatures_pos = line.index('{member_function_signatures}')
+        except:
+            member_function_signatures_pos = -1
+        if member_functions_pos != -1:
+            retval[0] = (i, member_functions_pos)
+        if reference_wrapped_member_functions_pos != -1:
+            retval[1] = (i, reference_wrapped_member_functions_pos)
+        if member_function_pointers_pos != -1:
+            retval[2] = (i, member_function_pointers_pos)
+        if member_function_signatures_pos != -1:
+            retval[3] = (i, member_function_signatures_pos)
+    return retval
+
+
 def find_expansion_lines_for_interface_file_writer(lines):
     retval = [0]
     for i in range(len(lines)):
@@ -42,7 +74,40 @@ def find_expansion_lines_for_interface_file_writer(lines):
     return retval
 
 
+def find_expansion_lines_for_vtable_interface_file_writer(lines):
+    retval = [0] * 2
+    for i in range(len(lines)):
+        line = lines[i]
+        try:
+            member_function_vtable_initialization_pos = line.index('{member_function_vtable_initialization}')
+        except:
+            member_function_vtable_initialization_pos = -1
+        try:
+            member_functions_pos = line.index('{member_functions}')
+        except:
+            member_functions_pos = -1
+
+        if member_function_vtable_initialization_pos != -1:
+            retval[0] = (i, member_function_vtable_initialization_pos)
+        if member_functions_pos != -1:
+            retval[1] = (i, member_functions_pos)
+    return retval
+
+
+class Function(object):
+    def __init__(self, name, signature, argument_names, return_str, is_const, ):
+        self.name = name
+        self.signature = signature
+        self.argument_names = argument_names
+        self.return_str = return_str
+        self.is_const = is_const
+        self.const_qualifier = (is_const and 'const ' or '')
+
+
 def function_data(data,cursor):
+    function_name = cursor.spelling
+    return_str = cursor.result_type.kind != TypeKind.VOID and 'return ' or ''
+
     tokens = get_tokens(data.tu, cursor)
 
     str = ''
@@ -57,7 +122,7 @@ def function_data(data,cursor):
         if identifier_regex.match(spelling) and i < len(tokens) - 1 and (
                 tokens[i + 1].spelling == comma or tokens[i + 1].spelling == close_paren):
             probably_args.append(spelling)
-        if close_paren_seen and spelling == const_token:
+        if close_paren_seen and spelling == 'const':
             constness = 'const'
         if spelling == close_paren:
             close_paren_seen = True
@@ -70,7 +135,6 @@ def function_data(data,cursor):
     args = [x for x in cursor.get_arguments()]
     args_str = ''
 
-    function_name = cursor.spelling
 
     for i in range(len(args)):
         arg_cursor = args[i]
@@ -89,9 +153,7 @@ def function_data(data,cursor):
             args_str += ', '
         args_str += arg_cursor.spelling
 
-    return_str = cursor.result_type.kind != TypeKind.VOID and 'return ' or ''
-
-    return [str, args_str, return_str, function_name, constness]
+    return Function( function_name, str, args_str, return_str, constness == 'const')
 
 
 def is_header_file(filename):
@@ -255,12 +317,125 @@ class HandleFileWriter(FormFileWriter):
         function = function_data(data, cursor)
         base_indent = self.namespace_indent + self.base_indent
 
-        self.lines[self.expansion_lines[1][0]] += base_indent + 'virtual ' + function[0] + ' = 0;\n'
+        self.lines[self.expansion_lines[1][0]] += base_indent + 'virtual ' + function.signature + ' = 0;\n'
         self.lines[self.expansion_lines[2][0]] += \
-            base_indent + 'virtual ' + function[0] + ' override\n' + \
+            base_indent + 'virtual ' + function.signature + ' override\n' + \
             base_indent + '{\n' + \
-            base_indent + self.base_indent + function[2] + 'value_.' + function[3] + '( ' + function[1] + ' );\n' + \
+            base_indent + self.base_indent + function.return_str + 'value_.' + function.name + '( ' + function.argument_names + ' );\n' + \
             base_indent + '}'
+
+
+def get_type_erased_function_pointer_type(function):
+    split_arguments = function.argument_names.split(',')
+    ptr_type = function.signature.replace(' ' + function.name + ' ', '(*)')
+    for argument in split_arguments:
+        if len(argument) > 0:
+            ptr_type = ptr_type.replace(' ' + trim(argument), '')
+    if function.is_const and trim(ptr_type).endswith(trim(function.const_qualifier)):
+        ptr_type = trim(ptr_type[:-len(function.const_qualifier)])
+    return ptr_type
+
+
+def get_execution_wrapper_function_type(function):
+    void_ptr = 'void*'
+    if len(function.argument_names) > 0:
+        void_ptr += ','
+    ptr_type = function.signature.replace(' ' + function.name + ' (', '(*)( ' + function.const_qualifier + void_ptr)
+    split_arguments = function.argument_names.split(',')
+    for argument in split_arguments:
+        if len(argument) > 0:
+            ptr_type = ptr_type.replace(' ' + trim(argument), '')
+    if function.is_const and ptr_type.endswith(trim(function.const_qualifier)):
+        ptr_type = trim(ptr_type[:-len(trim(function.const_qualifier))])
+    return ptr_type
+
+
+
+class VTableExecutionWrapperFileWriter(FormFileWriter):
+    def process_open_include_guard(self, filename):
+        self.include_guard = extract_include_guard(filename)
+        if self.include_guard is None:
+            return ''
+
+        copyright_ = ''
+        if trim(self.include_guard) != '#pragma once':
+            self.include_guard = self.include_guard.replace('#ifndef ', '#ifndef EXECUTION_WRAPPER_').replace('#define ', '#define EXECUTION_WRAPPER_')
+        if copyright_ != '':
+            self.file_content.append(copyright)
+        self.file_content.append(self.include_guard)
+
+    def process_open_class(self, data):
+        self.lines = data.handle_form_lines
+        self.expansion_lines = find_expansion_lines_for_vtable_execution_wrapper_file_writer(self.lines)
+
+        self.lines = map(
+            lambda line: line.format(
+                struct_name=data.current_struct.spelling,
+                namespace_prefix=data.handle_namespace,
+                member_functions='{member_functions}',
+                reference_wrapped_member_functions='{reference_wrapped_member_functions}',
+                member_function_pointers='{member_function_pointers}',
+                member_function_signatures='{member_function_signatures}'
+            ),
+            self.lines
+        )
+
+        self.lines[self.expansion_lines[0][0]] = ''
+        self.lines[self.expansion_lines[1][0]] = ''
+        self.lines[self.expansion_lines[2][0]] = ''
+        self.lines[self.expansion_lines[3][0]] = ''
+
+        super(VTableExecutionWrapperFileWriter, self).process_open_class(data)
+
+    def process_function(self, data, cursor):
+        if self.lines[self.expansion_lines[0][0]] != '':
+            self.lines[self.expansion_lines[0][0]] += '\n\n'
+            self.lines[self.expansion_lines[1][0]] += '\n\n'
+            self.lines[self.expansion_lines[2][0]] += '\n'
+            self.lines[self.expansion_lines[3][0]] += '\n'
+        function = function_data(data, cursor)
+        base_indent = self.namespace_indent + self.base_indent
+
+        index = function.signature.find( function.name + ' (') + len(function.name) + 1
+
+        start_of_function_definition = base_indent + 'static ' + function.signature[:index+2] + function.const_qualifier + 'void* impl'
+        if trim(function.argument_names) != '':
+            start_of_function_definition += ', '
+        else:
+            start_of_function_definition += ' '
+
+        if function.is_const:
+            end_of_signature = function.signature[index+2:-len(function.const_qualifier)]
+        else:
+            end_of_signature = function.signature[index+2:]
+
+        start_of_function_definition += \
+            end_of_signature + '\n' + \
+            base_indent + '{\n' + \
+            base_indent + self.base_indent + function.return_str + 'static_cast<' + function.const_qualifier
+
+
+        self.lines[self.expansion_lines[0][0]] += start_of_function_definition
+        self.lines[self.expansion_lines[1][0]] += start_of_function_definition
+
+        self.lines[self.expansion_lines[0][0]] += \
+            'Impl*>( impl )->' + function.name + '( '
+        self.lines[self.expansion_lines[1][0]] += \
+            'std::reference_wrapper<Impl>* >( impl )->get( ).' + function.name + '( '
+
+        end_of_function_definition = ''
+        if trim(function.argument_names) != '':
+            end_of_function_definition += function.argument_names + ' '
+        end_of_function_definition += ');\n' + base_indent + '}'
+
+        self.lines[self.expansion_lines[0][0]] += end_of_function_definition
+        self.lines[self.expansion_lines[1][0]] += end_of_function_definition
+
+
+        function_pointer_signature = get_execution_wrapper_function_type(function)
+        function_pointer_alias = function.name + '_function_type'
+        self.lines[self.expansion_lines[2][0]] += base_indent + function_pointer_alias + ' ' + function.name + ';'
+        self.lines[self.expansion_lines[3][0]] += base_indent + 'using ' + function_pointer_alias + ' = ' + function_pointer_signature + ';'
 
 
 def get_handle(line):
@@ -278,6 +453,149 @@ def get_handle(line):
                 if candidate in line:
                     return candidate
     return None
+
+
+class HeaderOnlyVTableInterfaceFileWriter(CppFileWriter):
+    def __init__(self, filename, base_indent, handle_namespace, comments=None):
+        self.handle_namespace = handle_namespace
+        self.lines = None
+        self.expansion_lines = None
+        super(HeaderOnlyVTableInterfaceFileWriter,self).__init__(filename, base_indent, comments)
+
+    def process_open_class(self, data):
+        super(HeaderOnlyVTableInterfaceFileWriter, self).process_open_class(data)
+
+        self.lines = data.interface_form_lines
+        self.expansion_lines = find_expansion_lines_for_vtable_interface_file_writer(self.lines)
+
+        comment = get_comment('', self.comments, self.current_struct_prefix)
+
+        if data.small_buffer_optimization:
+            self.lines = map(
+                lambda line: line.format(
+                    buffer_size=data.buffer,
+                    struct_prefix=comment + data.current_struct_prefix,
+                    struct_name=data.current_struct.spelling,
+                    namespace_prefix=data.handle_namespace,
+                    member_function_vtable_initialization='{member_function_vtable_initialization}',
+                    member_functions='{member_functions}',
+                ),
+                self.lines
+            )
+        else:
+            self.lines = map(
+                lambda line: line.format(
+                    struct_prefix=comment + data.current_struct_prefix,
+                    struct_name=data.current_struct.spelling,
+                    namespace_prefix=data.handle_namespace,
+                    member_function_vtable_initialization='{member_function_vtable_initialization}',
+                    member_functions='{member_functions}',
+                ),
+                self.lines
+            )
+
+        self.lines[self.expansion_lines[0][0]] = ''
+        self.lines[self.expansion_lines[1][0]] = ''
+
+    def process_function(self, data, cursor):
+        if self.lines[self.expansion_lines[0][0]] != '':
+            self.lines[self.expansion_lines[0][0]] += ',\n'
+        if self.lines[self.expansion_lines[1][0]] != '':
+            self.lines[self.expansion_lines[1][0]] += '\n\n'
+        function = function_data(data, cursor)
+        base_indent = self.class_indent
+
+        self.lines[self.expansion_lines[0][0]] += base_indent + 2*self.base_indent + \
+                                                  '&' + data.handle_namespace + '::execution_wrapper< typename std::decay<T>::type >::' + function.name
+        if data.copy_on_write:
+            if function.is_const:
+                impl_args = 'read( )'
+            else:
+                impl_args = 'write( )'
+        else:
+            impl_args = 'impl_'
+        if function.argument_names != '':
+            impl_args += ', ' + function.argument_names
+
+        self.lines[self.expansion_lines[1][0]] += \
+            base_indent + function.signature + '\n' + base_indent + '{\n' + \
+            base_indent + self.base_indent + 'assert( impl_ );\n' + \
+            base_indent + self.base_indent + function.return_str + 'vtable_.' + function.name + '( ' + impl_args + ' );\n' + \
+            base_indent + '}'
+
+    def process_close_class(self):
+        for line in self.lines:
+            split_lines = line.split('\n')
+            for split_line in split_lines:
+                self.file_content.append(self.namespace_indent + split_line + '\n')
+
+        self.lines = None
+        self.expansion_lines = None
+
+        super(HeaderOnlyVTableInterfaceFileWriter,self).process_close_class()
+
+
+class VTableInterfaceHeaderFileWriter(HeaderOnlyVTableInterfaceFileWriter):
+    def process_function(self, data, cursor):
+        if self.lines[self.expansion_lines[0][0]] != '':
+            self.lines[self.expansion_lines[0][0]] += ',\n'
+        if self.lines[self.expansion_lines[1][0]] != '':
+            self.lines[self.expansion_lines[1][0]] += '\n\n'
+        function = function_data(data, cursor)
+        base_indent = self.class_indent
+
+        self.lines[self.expansion_lines[0][0]] += \
+            base_indent + 2*self.base_indent + '&' + data.handle_namespace + \
+            '::execution_wrapper< typename std::decay<T>::type >::' + function.name
+        self.lines[self.expansion_lines[1][0]] += base_indent + function.signature + '\n' + base_indent + ';'
+
+
+class VTableInterfaceSourceFileWriter(HeaderOnlyVTableInterfaceFileWriter):
+    def process_open_include_guard(self, filename):
+        pass
+
+    def process_close_include_guard(self):
+        pass
+
+    def process_open_class(self, data):
+        super(VTableInterfaceSourceFileWriter, self).process_open_class(data)
+
+        self.lines = data.interface_cpp_form_lines
+        self.expansion_lines = find_expansion_lines_for_vtable_interface_file_writer(self.lines)
+
+        self.lines = map(
+            lambda line: line.format(
+                struct_name=data.current_struct.spelling,
+                member_functions='{member_functions}',
+            ),
+            self.lines
+        )
+
+        self.lines[self.expansion_lines[1][0]] = ''
+
+    def process_function(self, data, cursor):
+        if self.lines[self.expansion_lines[1][0]] != '':
+            self.lines[self.expansion_lines[1][0]] += '\n\n'
+        function = function_data(data, cursor)
+        base_indent = self.class_indent
+
+        if data.copy_on_write:
+            if function.is_const:
+                impl_args = 'read( )'
+            else:
+                impl_args = 'write( )'
+        else:
+            impl_args = 'impl_'
+
+        if function.argument_names != '':
+            impl_args += ', ' + function.argument_names
+
+        self.lines[self.expansion_lines[1][0]] += \
+            base_indent + function.signature.replace(' ' + function.name + ' ', ' ' + data.current_struct.spelling + '::' + function.name) + '\n' + \
+            base_indent + '{\n' + \
+            base_indent + self.base_indent + 'assert( impl_ );\n' + \
+            base_indent + self.base_indent + function.return_str + 'vtable_.' + function.name + '( ' + impl_args + ' );\n' + \
+            base_indent + '}'
 
 
 class HeaderOnlyInterfaceFileWriter(CppFileWriter):
@@ -323,17 +641,17 @@ class HeaderOnlyInterfaceFileWriter(CppFileWriter):
         function = function_data(data, cursor)
         base_indent = self.class_indent
 
-        nonvirtual_member = get_comment(base_indent, self.comments, function[0])
+        nonvirtual_member = get_comment(base_indent, self.comments, function.signature)
         nonvirtual_member += \
-            base_indent + function[0] + '\n' + \
+            base_indent + function.signature + '\n' + \
             base_indent + '{\n' + \
             base_indent + self.base_indent + 'assert(handle_);\n' + \
-            base_indent + self.base_indent + function[2]
+            base_indent + self.base_indent + function.return_str
         if data.copy_on_write:
-            nonvirtual_member += (function[4] == 'const' and 'read().' or 'write().')
+            nonvirtual_member += (function.is_const and 'read().' or 'write().')
         else:
             nonvirtual_member += 'handle_->'
-        nonvirtual_member += function[3] + '(' + function[1] + ' );\n' + \
+        nonvirtual_member += function.name + '(' + function.argument_names + ' );\n' + \
                              base_indent + '}'
 
         self.lines[self.expansion_lines[0][0]] += nonvirtual_member
@@ -391,8 +709,8 @@ class InterfaceHeaderFileWriter(HeaderOnlyInterfaceFileWriter):
         if self.lines[self.expansion_lines[0][0]]:
             self.lines[self.expansion_lines[0][0]] += '\n\n'
         function = function_data(data, cursor)
-        self.lines[self.expansion_lines[0][0]] += get_comment(self.class_indent, self.comments, function[0])
-        self.lines[self.expansion_lines[0][0]] += self.class_indent + function[0] + ';'
+        self.lines[self.expansion_lines[0][0]] += get_comment(self.class_indent, self.comments, function.signature)
+        self.lines[self.expansion_lines[0][0]] += self.class_indent + function.signature + ';'
 
 
 class InterfaceSourceFileWriter(HeaderOnlyInterfaceFileWriter):
@@ -425,23 +743,23 @@ class InterfaceSourceFileWriter(HeaderOnlyInterfaceFileWriter):
             self.lines[self.expansion_lines[0][0]] += '\n\n'
         function = function_data(data, cursor)
         nonvirtual_member = \
-            function[0].replace(function[3], data.current_struct.spelling + '::' + function[3]) + '\n' + \
+            function.signature.replace(' ' + function.name + ' ', ' ' + data.current_struct.spelling + '::' + function.name) + ' \n' + \
             '{\n' + \
             self.base_indent + 'assert(handle_);\n' + \
-            self.base_indent + function[2]
+            self.base_indent + function.return_str
         if data.copy_on_write:
-            nonvirtual_member += (function[4] == 'const' and 'read().' or 'write().')
+            nonvirtual_member += (function.is_const and 'read().' or 'write().')
         else:
             nonvirtual_member += 'handle_->'
-        nonvirtual_member += function[3] + '(' + function[1] + ' );\n' + '}'
+        nonvirtual_member += function.name + '(' + function.argument_names + ' );\n' + '}'
 
         self.lines[self.expansion_lines[0][0]] += nonvirtual_member
 
 
-class InterfaceFileWriter(FileProcessor):
-    def __init__(self, header_filename, source_filename, base_indent, handle_namespace, comments=None):
-        self.header_filewriter = InterfaceHeaderFileWriter(header_filename, base_indent, handle_namespace, comments)
-        self.source_filewriter = InterfaceSourceFileWriter(source_filename, base_indent, handle_namespace)
+class DistributedFileWriter(FileProcessor):
+    def __init__(self, header_filewriter, source_filewriter):
+        self.header_filewriter = header_filewriter
+        self.source_filewriter = source_filewriter
 
     def process_open_include_guard(self, filename):
         self.header_filewriter.process_open_include_guard(filename)
@@ -478,3 +796,17 @@ class InterfaceFileWriter(FileProcessor):
     def write_to_file(self):
         self.header_filewriter.write_to_file()
         self.source_filewriter.write_to_file()
+
+
+class InterfaceFileWriter(DistributedFileWriter):
+    def __init__(self, header_filename, source_filename, base_indent, handle_namespace, comments=None):
+        header_filewriter = InterfaceHeaderFileWriter(header_filename, base_indent, handle_namespace, comments)
+        source_file_writer = InterfaceSourceFileWriter(source_filename, base_indent, handle_namespace)
+        super(InterfaceFileWriter,self).__init__(header_filewriter, source_file_writer)
+
+
+class VTableInterfaceFileWriter(DistributedFileWriter):
+    def __init__(self, header_filename, source_filename, base_indent, handle_namespace, comments=None):
+        header_filewriter = VTableInterfaceHeaderFileWriter(header_filename, base_indent, handle_namespace, comments)
+        source_file_writer = VTableInterfaceSourceFileWriter(source_filename, base_indent, handle_namespace)
+        super(VTableInterfaceFileWriter,self).__init__(header_filewriter, source_file_writer)

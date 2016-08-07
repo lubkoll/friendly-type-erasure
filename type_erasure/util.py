@@ -116,8 +116,12 @@ def print_diagnostic(diag):
 
 def print_function(fun):
     print "Function:"
-    for f in fun:
-        print f
+    print 'signature: \t\t' + fun.signature
+    print 'name: \t\t\t' + fun.name
+    print 'arg names: \t\t' + fun.argument_names
+    print 'return str: \t\t' + fun.return_str
+    print 'const qualifier: \t' + fun.const_qualifier
+    print ''
 
 
 def unify_signature(function):
@@ -181,7 +185,8 @@ def add_default_arguments(parser):
     parser.add_argument('--handle-namespace', nargs='?', type=str, required=False,
                         default='',
                         help='namespace containing the handle implementations')
-
+    parser.add_argument('--vtable', action='store_true',
+                        help='use vtable-based type erasure')
 
 def parse_default_args(args, data):
     data.non_copyable = args.non_copyable
@@ -189,6 +194,7 @@ def parse_default_args(args, data):
     data.handle_extension = args.handle_extension
     data.handle_namespace = args.handle_namespace
     data.file = args.file
+    data.vtable = args.vtable
     data.clang_args = args.clang_args
     return data
 

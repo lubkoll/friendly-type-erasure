@@ -5,6 +5,7 @@ import clang
 from util import add_default_arguments, close_namespaces, parse_default_args, client_data, prepare_form
 from parser_addition import extract_includes
 from file_writer import HandleFileWriter
+from file_writer import VTableExecutionWrapperFileWriter
 from file_parser import GenericFileParser
 
 
@@ -40,7 +41,10 @@ def parse_args(args):
 def write_file(args, indentation):
     data = parse_args(args)
 
-    file_writer = HandleFileWriter(data.handle_file, indentation)
+    if data.vtable:
+        file_writer = VTableExecutionWrapperFileWriter(data.handle_file, indentation)
+    else:
+        file_writer = HandleFileWriter(data.handle_file, indentation)
     file_writer.process_open_include_guard(args.file)
     file_writer.process_headers(extract_includes(args.handle_headers))
 

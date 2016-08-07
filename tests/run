@@ -23,7 +23,7 @@ cp util.hh gen/
 cp mock_fooable.hh gen/
 cd gen
 
-# generate type erased interfaces
+# inheritance-based type-erased interfaces
 prepare_test_case basic Basic
 prepare_test_case basic_header_only BasicHeaderOnly
 
@@ -35,7 +35,15 @@ prepare_test_case sbo_header_only SBOHeaderOnly
 
 prepare_test_case sbo_cow SBO_COW
 prepare_test_case sbo_cow_header_only SBO_COWHeaderOnly
+
+# vtable-based type-erased interfaces
+prepare_test_case vtable_basic VTableBasic
+prepare_test_case vtable_basic_header_only VTableBasicHeaderOnly
+
+prepare_test_case vtable_cow VTableCOW
+prepare_test_case vtable_cow_header_only VTableCOWHeaderOnly
+
 cd ..
 
 # run unit tests
-rm -rf build && mkdir build && cd build && cmake .. && make && ./unit_tests && cd ..
+rm -rf build && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug && make && ./unit_tests && cd ..

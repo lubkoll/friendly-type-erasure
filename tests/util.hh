@@ -1,10 +1,9 @@
-
 #define CHECK_HEAP_ALLOC(expression, expected_allocations) \
     reset_heap_allocations(); \
     expression; \
     { \
       auto n_heap_allocations = heap_allocations(); \
-      EXPECT_EQ( n_heap_allocations, expected_allocations ); \
+      EXPECT_EQ( expected_allocations, n_heap_allocations ); \
     }
 
 

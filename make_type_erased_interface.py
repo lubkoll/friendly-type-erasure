@@ -55,26 +55,49 @@ def parse_args(args):
     return data
 
 
-def get_handle_from(args):
-    if not args.copy_on_write and not args.small_buffer_optimization:
-        return absolute_path('forms/basic_handle.hpp')
-    elif args.copy_on_write and not args.small_buffer_optimization:
-        return absolute_path('forms/cow_handle.hpp')
-    elif not args.copy_on_write and args.small_buffer_optimization:
-       return absolute_path('forms/sbo_handle.hpp')
+def get_handle_form(args):
+    if args.vtable:
+        if args.copy_on_write:
+            return absolute_path('forms/vtable_based/cow/execution_wrapper.hpp')
+        return absolute_path('forms/vtable_based/basic/execution_wrapper.hpp')
     else:
-        return absolute_path('forms/sbo_cow_handle.hpp')
+        if not args.copy_on_write and not args.small_buffer_optimization:
+            return absolute_path('forms/inheritance_based/basic/handle_form.hpp')
+        elif args.copy_on_write and not args.small_buffer_optimization:
+            return absolute_path('forms/inheritance_based/cow/handle_form.hpp')
+        elif not args.copy_on_write and args.small_buffer_optimization:
+           return absolute_path('forms/inheritance_based/sbo/handle_form.hpp')
+        else:
+            return absolute_path('forms/inheritance_based/sbo_cow/handle_form.hpp')
+
+
+def get_inheritance_based_interface_form(args):
+    if args.copy_on_write and args.small_buffer_optimization:
+        return absolute_path('forms/inheritance_based/sbo_cow/form.hpp')
+    elif args.copy_on_write and not args.small_buffer_optimization:
+        return absolute_path('forms/inheritance_based/cow/form.hpp')
+    elif not args.copy_on_write and args.small_buffer_optimization:
+        return absolute_path('forms/inheritance_based/sbo/form.hpp')
+    else:
+        return absolute_path('forms/inheritance_based/basic/form.hpp')
+
+
+def get_vtable_based_interface_form(args):
+    if args.copy_on_write and args.small_buffer_optimization:
+        return absolute_path('forms/vtable_based/sbo_cow/form.hpp')
+    elif args.copy_on_write and not args.small_buffer_optimization:
+        return absolute_path('forms/vtable_based/cow/form.hpp')
+    elif not args.copy_on_write and args.small_buffer_optimization:
+        return absolute_path('forms/vtable_based/sbo/form.hpp')
+    else:
+        return absolute_path('forms/vtable_based/basic/form.hpp')
 
 
 def get_interface_form(args):
-    if args.copy_on_write and args.small_buffer_optimization:
-        return absolute_path('forms/sbo_cow.hpp')
-    elif args.copy_on_write and not args.small_buffer_optimization:
-        return absolute_path('forms/cow.hpp')
-    elif not args.copy_on_write and args.small_buffer_optimization:
-        return absolute_path('forms/sbo.hpp')
+    if args.vtable:
+        return get_vtable_based_interface_form(args)
     else:
-        return absolute_path('forms/basic.hpp')
+        return get_inheritance_based_interface_form(args)
 
 
 class NamespaceNamesExtractor(type_erasure.file_parser.FileProcessor):
@@ -112,13 +135,22 @@ if __name__ == "__main__":
         Config.set_library_path(args.clang_path)
     args.handle_namespace = get_handle_namespace_name(args)
 
-    call(["cp", absolute_path("forms/util.hh"), args.handle_folder + "/"])
-
-    if args.copy_on_write and args.small_buffer_optimization:
-        args.handle_headers = absolute_path('headers/sbo_cow_handle.hpp')
+    if args.vtable:
+        call(["cp", absolute_path("forms/vtable_based/vtable_util.hh"), args.handle_folder + "/"])
     else:
-        args.handle_headers = absolute_path('headers/handle.hpp')
-    args.handle_form = get_handle_from(args)
+        call(["cp", absolute_path("forms/inheritance_based/util.hh"), args.handle_folder + "/"])
+
+    if args.vtable:
+        if args.copy_on_write:
+            args.handle_headers = absolute_path('headers/vtable_cow.hpp')
+        else:
+            args.handle_headers = absolute_path('headers/vtable.hpp')
+    else:
+        if args.copy_on_write and args.small_buffer_optimization:
+            args.handle_headers = absolute_path('headers/sbo_cow_handle.hpp')
+        else:
+            args.handle_headers = absolute_path('headers/handle.hpp')
+    args.handle_form = get_handle_form(args)
     args.interface_form = get_interface_form(args)
 
     indentation = ' ' * args.indent
