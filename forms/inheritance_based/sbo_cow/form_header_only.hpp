@@ -7,7 +7,7 @@
     using HeapAllocatedHandle = Handle<T, Buffer, true>;
 
 public:
-    %struct_name% ( ) = default;
+    %struct_name% ( ) noexcept = default;
 
     // Constructors
     template <typename T,
@@ -77,7 +77,7 @@ public:
      * @brief Checks if the type-erased interface holds an implementation.
      * @return true if an implementation is stored, else false
      */
-    explicit operator bool( ) const
+    explicit operator bool( ) const noexcept
     {
         return handle_ != nullptr;
     }
@@ -137,7 +137,7 @@ public:
     %nonvirtual_members%
 
 private:
-    void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer )
+    void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer ) noexcept
     {
         using namespace type_erasure_detail;
         const bool this_heap_allocated = heap_allocated( handle_, buffer_ );
@@ -164,13 +164,13 @@ private:
         }
     }
 
-    void reset ( )
+    void reset ( ) noexcept
     {
         if ( handle_ )
             handle_->destroy( );
     }
 
-    const HandleBase<Buffer>& read ( ) const
+    const HandleBase<Buffer>& read ( ) const noexcept
     {
         return *handle_;
     }

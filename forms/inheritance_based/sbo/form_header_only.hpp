@@ -8,7 +8,7 @@
 
 public:
     // Contructors
-    %struct_name% () = default;
+    %struct_name% () noexcept = default;
 
     template <typename T,
               typename std::enable_if<
@@ -69,7 +69,7 @@ public:
      * @brief Checks if the type-erased interface holds an implementation.
      * @return true if an implementation is stored, else false
      */
-    explicit operator bool( ) const
+    explicit operator bool( ) const noexcept
     {
         return handle_ != nullptr;
     }
@@ -105,7 +105,7 @@ public:
     %nonvirtual_members%
 
 private:
-    void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer )
+    void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer ) noexcept
     {
         using namespace type_erasure_detail;
         const auto this_heap_allocated = !handle_ || handle_->heap_allocated();
@@ -132,7 +132,7 @@ private:
         }
     }
 
-    void reset ( )
+    void reset ( ) noexcept
     {
         if ( handle_ )
             handle_->destroy( );

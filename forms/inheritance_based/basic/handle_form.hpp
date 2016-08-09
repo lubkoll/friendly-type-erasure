@@ -25,7 +25,7 @@ namespace %namespace_prefix%
             : value_( std::forward<U>(value) )
         {}
 
-        virtual HandleBase* clone () const
+        HandleBase* clone () const override
         {
             return new Handle(value_);
         }
@@ -39,7 +39,7 @@ namespace %namespace_prefix%
     template <typename T>
     struct Handle< std::reference_wrapper<T> > : Handle<T&>
     {
-        Handle (std::reference_wrapper<T> ref)
+        Handle (std::reference_wrapper<T> ref) noexcept
             : Handle<T&> (ref.get())
         {}
     };

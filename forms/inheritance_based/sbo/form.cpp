@@ -28,14 +28,14 @@
     reset( );
 }
 
-%struct_name%::operator bool( ) const
+%struct_name%::operator bool( ) const noexcept
 {
     return handle_ != nullptr;
 }
 
 %nonvirtual_members%
 
-void %struct_name%::swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer )
+void %struct_name%::swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer ) noexcept
 {
     using namespace type_erasure_detail;
     const auto this_heap_allocated = !handle_ || handle_->heap_allocated();
@@ -62,7 +62,7 @@ void %struct_name%::swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buff
     }
 }
 
-void %struct_name%::reset ( )
+void %struct_name%::reset ( ) noexcept
 {
     if ( handle_ )
         handle_->destroy( );

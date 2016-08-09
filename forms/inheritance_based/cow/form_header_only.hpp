@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    constexpr %struct_name% () = default;
+    constexpr %struct_name% () noexcept = default;
 
     template <typename T,
               typename std::enable_if<
@@ -32,7 +32,7 @@ public:
      * @brief Checks if the type-erased interface holds an implementation.
      * @return true if an implementation is stored, else false
      */
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return handle_ != nullptr;
     }
@@ -62,13 +62,15 @@ public:
     %nonvirtual_members%
 
 private:
-    const HandleBase& read () const
+    const HandleBase& read () const noexcept
     {
+        assert(handle_);
         return *handle_;
     }
 
     HandleBase& write ()
     {
+        assert(handle_);
         if (!handle_.unique())
             handle_ = handle_->clone();
         return *handle_;

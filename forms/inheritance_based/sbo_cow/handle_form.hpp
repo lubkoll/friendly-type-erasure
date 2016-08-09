@@ -6,8 +6,8 @@ namespace %namespace_prefix%
         virtual ~HandleBase ( ) = default;
         virtual HandleBase* clone_into( Buffer & buf ) const = 0;
         virtual bool unique( ) const = 0;
-        virtual void add_ref( ) = 0;
-        virtual void destroy( ) = 0;
+        virtual void add_ref( ) noexcept = 0;
+        virtual void destroy( ) noexcept = 0;
         %pure_virtual_members%
     };
 
@@ -43,12 +43,12 @@ namespace %namespace_prefix%
             return ref_count_ == 1u; 
         }
 
-        void add_ref ( ) override
+        void add_ref ( ) noexcept override
         { 
             ++ref_count_; 
         }
 
-        void destroy ( ) override
+        void destroy ( ) noexcept override
         {
             if ( ref_count_ == 1u ) {
                 if ( HeapAllocated )
@@ -69,7 +69,7 @@ namespace %namespace_prefix%
     template <class T, class Buffer, bool HeapAllocated>
     struct Handle<std::reference_wrapper<T>, Buffer, HeapAllocated> : Handle<T&, Buffer, HeapAllocated>
     {
-        Handle ( std::reference_wrapper<T> ref ) :
+        Handle ( std::reference_wrapper<T> ref ) noexcept :
             Handle<T&, Buffer, HeapAllocated> ( ref.get( ) )
         {}
     };

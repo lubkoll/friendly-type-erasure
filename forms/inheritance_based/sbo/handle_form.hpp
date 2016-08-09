@@ -6,7 +6,7 @@ namespace %namespace_prefix%
         virtual ~HandleBase () {}
         virtual HandleBase* clone_into (Buffer& buffer) const = 0;
         virtual bool heap_allocated () const = 0;
-        virtual void destroy () = 0;
+        virtual void destroy () noexcept = 0;
         %pure_virtual_members%
     };
 
@@ -30,17 +30,17 @@ namespace %namespace_prefix%
             value_( std::forward<U>(value) )
         {}
 
-        virtual HandleBase<Buffer>* clone_into (Buffer& buffer) const
+        HandleBase<Buffer>* clone_into (Buffer& buffer) const override
         {
             return type_erasure_detail::clone_impl< HandleBase<Buffer>, Handle<T,Buffer,false>, Handle<T,Buffer,true> >( value_, buffer );
         }
 
-        virtual bool heap_allocated () const
+        bool heap_allocated () const override
         {
             return HeapAllocated;
         }
 
-        virtual void destroy ()
+        void destroy () noexcept override
         {
             if (HeapAllocated)
                 delete this;
@@ -56,7 +56,7 @@ namespace %namespace_prefix%
     template <typename T, typename Buffer, bool HeapAllocated>
     struct Handle< std::reference_wrapper<T>, Buffer, HeapAllocated > : Handle< T&, Buffer, HeapAllocated >
     {
-        Handle( std::reference_wrapper<T> ref ) :
+        Handle( std::reference_wrapper<T> ref ) noexcept :
             Handle<T&, Buffer, HeapAllocated>( ref.get() )
         {}
     };

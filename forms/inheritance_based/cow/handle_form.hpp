@@ -27,7 +27,7 @@ namespace %namespace_prefix%
             : value_( std::forward<U>(value) )
         {}
 
-        virtual std::shared_ptr<HandleBase> clone () const
+        std::shared_ptr<HandleBase> clone () const override
         {
             return std::make_shared<Handle>(value_);
         }
@@ -41,7 +41,7 @@ namespace %namespace_prefix%
     template <typename T>
     struct Handle< std::reference_wrapper<T> > : Handle<T&>
     {
-        Handle (std::reference_wrapper<T> ref)
+        Handle (std::reference_wrapper<T> ref) noexcept
             : Handle<T&> (ref.get())
         {}
     };

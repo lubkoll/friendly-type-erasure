@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    constexpr %struct_name% ( ) = default;
+    constexpr %struct_name% ( ) noexcept = default;
 
     template <typename T,
               typename std::enable_if<

@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    constexpr %struct_name%( ) = default;
+    constexpr %struct_name%( ) noexcept = default;
 
     template <typename T,
               typename std::enable_if<
@@ -32,7 +32,7 @@ public:
      * @brief Checks if the type-erased interface holds an implementation.
      * @return true if an implementation is stored, else false
      */
-    explicit operator bool( ) const;
+    explicit operator bool( ) const noexcept;
 
     /**
      * @brief Conversion of the stored implementation to @code T*@endcode.
@@ -59,7 +59,7 @@ public:
     %nonvirtual_members%
 
 private:
-    const HandleBase& read( ) const;
+    const HandleBase& read( ) const noexcept;
 
     HandleBase& write( );
 
