@@ -9,5 +9,5 @@ rm -rf $HANDLE_FOLDER
 mkdir $HANDLE_FOLDER
 rm -f $INTERFACE_FILE
 rm -f $INTERFACE_FILE_CPP
-python2 /home/lars/Projects/spacy_type_erasure/make_type_erased_interface.py -cow --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+python2 ../../../make_type_erased_interface.py -cow --handle-folder $HANDLE_FOLDER --handle-file handles/handle_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
 

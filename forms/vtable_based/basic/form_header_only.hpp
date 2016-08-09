@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    %struct_name%( ) :
+    %struct_name%( ) noexcept :
         impl_ ( nullptr )
     { }
 
@@ -19,7 +19,7 @@ public:
 
     %struct_name% ( const %struct_name%& other ) :
         vtable_ ( other.vtable_ ),
-        impl_ ( other.clone( ) )
+        impl_ ( other.impl_ ? other.vtable_.clone( other.impl_) : nullptr )
     { }
 
     %struct_name% ( %struct_name%&& other ) noexcept :
@@ -42,17 +42,15 @@ public:
 
     %struct_name%& operator= ( const %struct_name%& other )
     {
-        %struct_name% temp( other );
-        std::swap( temp, *this );
-        return *this;
+        vtable_ = other.vtable_;
+        impl_ = other.impl_ ? other.vtable_.clone( other.impl_) : nullptr;
+	return *this;
     }
 
     %struct_name%& operator= ( %struct_name%&& other ) noexcept
     {
-        using std::swap;
-        %struct_name% temp( std::move( other ) );
-        swap( temp.vtable_, vtable_ );
-        swap( temp.impl_, impl_ );
+        vtable_ = other.vtable_;
+        impl_ = other.impl_;
         other.impl_ = nullptr;
         return *this;
     }
@@ -88,13 +86,6 @@ public:
     %member_functions%
 
 private:
-    void* clone ( ) const
-    {
-        if( impl_ )
-            return vtable_.clone( impl_ );
-        return nullptr;
-    }
-
     %namespace_prefix%::vtable vtable_;
     void* impl_;
 };
