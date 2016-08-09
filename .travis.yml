@@ -23,8 +23,10 @@ before_install:
   - sudo cp *.a /usr/lib
   - cd $TRAVIS_BUILD_DIR
 script:
+  - cd tests
   - ./run
   - cd build && rm -rf * && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ./unit_tests && cd ..
+  - cd ..
 after_success:
   # - cd build
   # - ctest
