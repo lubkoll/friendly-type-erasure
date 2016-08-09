@@ -1,6 +1,6 @@
 %struct_prefix%
 {
-    using Buffer = std::array<unsigned char, %buffer_size%>;
+    using Buffer = std::array<char, %buffer_size%>;
     template <class T>
     using StackAllocatedHandle = Handle<T,Buffer,false>;
     template <class T>
@@ -24,6 +24,8 @@ public:
     {
         if ( other.handle_ )
             handle_ = other.handle_->clone_into( buffer_ );
+        else
+            handle_ = nullptr;
     }
 
     %struct_name% ( %struct_name%&& other ) noexcept

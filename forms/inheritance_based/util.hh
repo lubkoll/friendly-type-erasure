@@ -16,14 +16,13 @@ namespace type_erasure_detail
         return nullptr;
     }
 
-
-    template <class BufferHandle, class Buffer>
+    template <class T, class Buffer>
     inline void* get_buffer_ptr ( Buffer& buffer )
     {
         void* buffer_ptr = &buffer;
         auto buffer_size = sizeof(buffer);
-        return std::align( alignof(BufferHandle),
-                           sizeof(BufferHandle),
+        return std::align( alignof(T),
+                           sizeof(T),
                            buffer_ptr,
                            buffer_size);
 
@@ -47,25 +46,25 @@ namespace type_erasure_detail
     }
 
     template <typename T>
-    inline unsigned char* char_ptr ( T* ptr ) noexcept
+    inline char* char_ptr ( T* ptr ) noexcept
     {
-        return static_cast<unsigned char*>( static_cast<void*>( ptr ) );
+        return static_cast<char*>( static_cast<void*>( ptr ) );
     }
 
     template <typename T>
-    inline const unsigned char* char_ptr( const T* ptr ) noexcept
+    inline const char* char_ptr( const T* ptr ) noexcept
     {
-        return static_cast<const unsigned char*>( static_cast<const void*>( ptr ) );
+        return static_cast<const char*>( static_cast<const void*>( ptr ) );
     }
 
     template <class HandleBase>
-    inline HandleBase* handle_ptr ( unsigned char* ptr ) noexcept
+    inline HandleBase* handle_ptr ( char* ptr ) noexcept
     {
         return static_cast<HandleBase*>(static_cast<void*>(ptr));
     }
 
     template <class HandleBase>
-    inline const HandleBase* handle_ptr( const unsigned char* ptr ) noexcept
+    inline const HandleBase* handle_ptr( const char* ptr ) noexcept
     {
         return static_cast<const HandleBase*>( static_cast<const void*>(ptr) );
     }
@@ -83,5 +82,4 @@ namespace type_erasure_detail
         return handle < handle_ptr<HandleBase>( char_ptr(&buffer) ) ||
                handle_ptr<HandleBase>( char_ptr(&buffer) + sizeof(buffer) ) <= handle;
     }
-
 }

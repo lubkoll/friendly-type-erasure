@@ -57,8 +57,10 @@ def parse_args(args):
 
 def get_handle_form(args):
     if args.vtable:
-        if args.copy_on_write:
+        if args.copy_on_write and not args.small_buffer_optimization:
             return absolute_path('forms/vtable_based/cow/execution_wrapper.hpp')
+        elif not args.copy_on_write and args.small_buffer_optimization:
+            return absolute_path('forms/vtable_based/sbo/execution_wrapper.hpp')
         return absolute_path('forms/vtable_based/basic/execution_wrapper.hpp')
     else:
         if not args.copy_on_write and not args.small_buffer_optimization:

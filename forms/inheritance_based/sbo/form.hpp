@@ -1,6 +1,6 @@
 %struct_prefix%
 {
-    using Buffer = std::array<unsigned char, %buffer_size%>;
+    using Buffer = std::array<char, %buffer_size%>;
     template <class T>
     using StackAllocatedHandle = Handle<T,Buffer,false>;
     template <class T>
