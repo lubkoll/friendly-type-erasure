@@ -18,9 +18,12 @@ public:
         }),
         impl_ ( nullptr )
     {
-        if( sizeof( typename std::decay<T>::type ) <= sizeof( Buffer ) )
+        void* buffer_ptr = &buffer_;
+        auto buffer_size = sizeof(Buffer);
+        std::align( alignof(T), sizeof(T), buffer_ptr, buffer_size );
+
+        if( sizeof( typename std::decay<T>::type ) <= buffer_size )
         {
-            auto buffer_ptr = vtable_.align_buffer( buffer_ );
             new (buffer_ptr) typename std::decay<T>::type( std::forward<T>(value) );
             impl_ = buffer_ptr;
         }
