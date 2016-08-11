@@ -4,54 +4,47 @@
 
 public:
     // Contructors
-    %struct_name%( ) :
+    %struct_name%( ) noexcept :
         impl_ ( nullptr )
     { }
 
     template <typename T,
               typename std::enable_if< !std::is_same<%struct_name%, typename std::decay<T>::type>::value >::type* = nullptr>
     %struct_name% ( T&& value ) :
-        vtable_ ({ 
-            &type_erasure_vtable_detail::delete_impl< typename std::decay<T>::type >,
-            &type_erasure_vtable_detail::clone_impl< typename std::decay<T>::type >,
+        vtable_ { 
+            &type_erasure_vtable_detail::clone_into_impl< typename std::decay<T>::type >,
             &type_erasure_vtable_detail::clone_into_buffer< typename std::decay<T>::type, Buffer >,
             &type_erasure_vtable_detail::get_buffer_ptr< typename std::decay<T>::type, Buffer >,
 	    %member_function_vtable_initialization%
-        }),
+        },
         impl_ ( nullptr )
     {
-        if( sizeof( typename std::decay<T>::type ) <= sizeof( Buffer ) )
+        void* buffer_ptr = &buffer_;
+        auto buffer_size = sizeof(Buffer);
+        std::align( alignof(T), sizeof(T), buffer_ptr, buffer_size );
+
+        using Decayed = typename std::decay<T>::type;
+        if( sizeof( Decayed ) <= buffer_size )
         {
-            auto buffer_ptr = vtable_.align_buffer( buffer_ );
-            new (buffer_ptr) typename std::decay<T>::type( std::forward<T>(value) );
-            impl_ = buffer_ptr;
+            new (buffer_ptr) Decayed( std::forward<T>(value) );
+            impl_ = std::shared_ptr<Decayed>( std::shared_ptr<Decayed>( nullptr ), static_cast<Decayed*>( buffer_ptr ) );
         }
-        else
-            impl_ = new typename std::decay<T>::type( std::forward<T>(value) );
+        else            
+            impl_ = std::make_shared<Decayed>( std::forward<T>(value) );
     }
 
     %struct_name% ( const %struct_name%& other ) :
-        vtable_( other.vtable_ )
-    {
-        impl_ = other.clone_into( buffer_ );
-    }
+        vtable_( other.vtable_ ),
+        impl_( other.impl_ )
+    {}
 
     %struct_name% ( %struct_name%&& other ) noexcept :
         vtable_( other.vtable_ )
     {
-        if( !other.impl_ ) {
-            reset( );
-            impl_ = nullptr;
-            return;
-        }
-
-        if( type_erasure_vtable_detail::is_heap_allocated( other.impl_, other.buffer_ ) )
-            impl_ = other.impl_;
+        if( type_erasure_vtable_detail::is_heap_allocated( other.impl_.get( ), other.buffer_ ) )
+            impl_ = std::move( other.impl_ );
         else
-        {
-            buffer_ = std::move( other.buffer_ );
-            impl_ = vtable_.align_buffer( buffer_ );
-        }
+            other.vtable_.clone_into( other.impl_.get( ), buffer_, impl_ );
 
         other.impl_ = nullptr;
     }
@@ -67,37 +60,22 @@ public:
     %struct_name%& operator= ( const %struct_name%& other )
     {
         vtable_ = other.vtable_;
-        impl_ = other.clone_into( buffer_ );
+        impl_ = other.impl_;
         return *this;
     }
 
     %struct_name%& operator= ( %struct_name%&& other ) noexcept
     {
-        if( !other.impl_ ) {
-            reset( );
-            impl_ = nullptr;
-            return *this;
-        }
-
         vtable_ = other.vtable_;
-        if( type_erasure_vtable_detail::is_heap_allocated( other.impl_, other.buffer_ ) )
-            impl_ = other.impl_;
+        if( type_erasure_vtable_detail::is_heap_allocated( other.impl_.get( ), other.buffer_ ) )
+            impl_ = std::move( other.impl_ );
         else
-        {
-            buffer_ = std::move( other.buffer_ );
-            impl_  = vtable_.align_buffer( buffer_ );
-        }
+            other.vtable_.clone_into( other.impl_.get( ), buffer_, impl_ );
 
         other.impl_ = nullptr;
 
         return *this;
     }
-
-    ~%struct_name% ( )
-    {
-        reset( );
-    }
-
     /**
      * @brief Conversion of the stored implementation to @code T*@endcode.
      * @return pointer to stored object if conversion to @code T*@endcode
@@ -106,7 +84,7 @@ public:
     template <typename T>
     T* target( ) noexcept
     {
-        return type_erasure_vtable_detail::cast_impl<T>( impl_ );
+        return type_erasure_vtable_detail::cast_impl<T>( impl_.get( ) );
     }
     
     /**
@@ -117,32 +95,32 @@ public:
     template <typename T>
     const T* target( ) const noexcept
     {
-        return type_erasure_vtable_detail::cast_impl<T>( impl_ );
+        return type_erasure_vtable_detail::cast_impl<T>( impl_.get( ) );
     }
 
     %member_functions%
 
 private:
-    void reset( )
+    void* read( ) const
     {
-        if( impl_ && type_erasure_vtable_detail::is_heap_allocated( impl_, buffer_ ) )
-            vtable_.del( impl_ );
+        return impl_.get( );
     }
 
-    void* clone_into ( Buffer& buffer ) const
+    void* write( )
     {
-        if( !impl_ )
-            return nullptr;
-
-        if( type_erasure_vtable_detail::heap_allocated( impl_, buffer_ ) )
-            return vtable_.clone( impl_ );
-
-        return vtable_.clone_into( impl_, buffer );
+        if( !impl_.unique( ) )
+        {
+            if( type_erasure_vtable_detail::is_heap_allocated( impl_.get( ), buffer_) )
+                vtable_.clone( impl_.get( ), impl_ );
+            else
+                vtable_.clone_into( impl_.get( ), buffer_, impl_ );
+        }
+        return impl_.get( );
     }
 
     %namespace_prefix%::vtable<Buffer> vtable_;
     Buffer buffer_;
-    void* impl_ = nullptr;
+    std::shared_ptr<void> impl_;
 };
 
 

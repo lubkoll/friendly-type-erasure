@@ -11,7 +11,6 @@ namespace type_erasure_vtable_detail
                            sizeof(T),
                            buffer_ptr,
                            buffer_size);
-
     }
 
     template < class T >
@@ -35,6 +34,15 @@ namespace type_erasure_vtable_detail
         auto buffer_ptr = get_buffer_ptr<T>( buffer );
         new (buffer_ptr) T( *static_cast<T*>( impl ) );
         return buffer_ptr;
+    }
+
+    template< class T, class Buffer >
+    inline void clone_into_buffer( void* impl, Buffer& buffer, std::shared_ptr<void>& impl_ ) noexcept
+    {
+        assert(impl);
+        auto buffer_ptr = get_buffer_ptr<T>( buffer );
+        new (buffer_ptr) T( *static_cast<T*>( impl ) );
+	impl_ = std::shared_ptr<T>( std::shared_ptr<T>( nullptr ), static_cast<T*>( buffer_ptr ) );
     }
 
     template < class T >
@@ -84,10 +92,15 @@ namespace type_erasure_vtable_detail
     }
 
     template < class Buffer >
-    inline bool heap_allocated ( void* impl, const Buffer& buffer ) noexcept
+    inline bool is_heap_allocated ( void* impl, const Buffer& buffer ) noexcept
     {
-        assert(impl);
         return impl < static_cast<const void*>(&buffer) ||
                static_cast<const void*>( char_ptr(&buffer) + sizeof(buffer) ) <= impl;
+    }
+
+    template < class Buffer >
+    inline bool heap_allocated ( void* impl, const Buffer& buffer ) noexcept
+    {
+        return is_heap_allocated( impl, buffer );
     }
 }

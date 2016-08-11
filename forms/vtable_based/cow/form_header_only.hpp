@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    %struct_name%( ) :
+    %struct_name%( ) noexcept :
         impl_ ( nullptr )
     { }
 
@@ -52,7 +52,7 @@ public:
     %member_functions%
 
 private:
-    void* read( ) const
+    void* read( ) const noexcept
     {
         return impl_.get( );
     }
