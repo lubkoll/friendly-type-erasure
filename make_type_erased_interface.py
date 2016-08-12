@@ -18,13 +18,7 @@ def create_parser():
     parser.add_argument('--handle-folder', nargs='?', type=str, required=False,
                         default='handles',
                         help='folder for handle implementations')
-#    parser.add_argument('-cow', '--copy-on-write', nargs='?', type=bool, required=False,
-#                        const=True, default=False,
-#                        help='enables copy on write')
     return parser
-
-def absolute_path(filename):
-    return os.path.join(os.path.dirname(__file__), filename)
 
 class client_data:
     def __init__(self):
@@ -58,43 +52,44 @@ def parse_args(args):
 def get_handle_form(args):
     if args.vtable:
         if args.copy_on_write and args.small_buffer_optimization:
-            return absolute_path('forms/vtable_based/sbo_cow/execution_wrapper.hpp')
+            return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'sbo_cow', 'execution_wrapper.hpp')
         elif args.copy_on_write and not args.small_buffer_optimization:
-            return absolute_path('forms/vtable_based/cow/execution_wrapper.hpp')
+            return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'cow', 'execution_wrapper.hpp')
         elif not args.copy_on_write and args.small_buffer_optimization:
-            return absolute_path('forms/vtable_based/sbo/execution_wrapper.hpp')
-        return absolute_path('forms/vtable_based/basic/execution_wrapper.hpp')
-    else:
-        if not args.copy_on_write and not args.small_buffer_optimization:
-            return absolute_path('forms/inheritance_based/basic/handle_form.hpp')
-        elif args.copy_on_write and not args.small_buffer_optimization:
-            return absolute_path('forms/inheritance_based/cow/handle_form.hpp')
-        elif not args.copy_on_write and args.small_buffer_optimization:
-           return absolute_path('forms/inheritance_based/sbo/handle_form.hpp')
+            return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'sbo', 'execution_wrapper.hpp')
         else:
-            return absolute_path('forms/inheritance_based/sbo_cow/handle_form.hpp')
+            return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'basic', 'execution_wrapper.hpp')
+    else:
+        if args.copy_on_write and args.small_buffer_optimization:
+            return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'sbo_cow', 'handle_form.hpp')
+        elif args.copy_on_write and not args.small_buffer_optimization:
+            return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'cow', 'handle_form.hpp')
+        elif not args.copy_on_write and args.small_buffer_optimization:
+            return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'sbo', 'handle_form.hpp')
+        else:
+            return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'basic', 'handle_form.hpp')
 
 
 def get_inheritance_based_interface_form(args):
     if args.copy_on_write and args.small_buffer_optimization:
-        return absolute_path('forms/inheritance_based/sbo_cow/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'sbo_cow', 'form.hpp')
     elif args.copy_on_write and not args.small_buffer_optimization:
-        return absolute_path('forms/inheritance_based/cow/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'cow', 'form.hpp')
     elif not args.copy_on_write and args.small_buffer_optimization:
-        return absolute_path('forms/inheritance_based/sbo/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'sbo', 'form.hpp')
     else:
-        return absolute_path('forms/inheritance_based/basic/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'basic', 'form.hpp')
 
 
 def get_vtable_based_interface_form(args):
     if args.copy_on_write and args.small_buffer_optimization:
-        return absolute_path('forms/vtable_based/sbo_cow/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'sbo_cow', 'form.hpp')
     elif args.copy_on_write and not args.small_buffer_optimization:
-        return absolute_path('forms/vtable_based/cow/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'cow', 'form.hpp')
     elif not args.copy_on_write and args.small_buffer_optimization:
-        return absolute_path('forms/vtable_based/sbo/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'sbo', 'form.hpp')
     else:
-        return absolute_path('forms/vtable_based/basic/form.hpp')
+        return os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'basic', 'form.hpp')
 
 
 def get_interface_form(args):
@@ -140,20 +135,20 @@ if __name__ == "__main__":
     args.handle_namespace = get_handle_namespace_name(args)
 
     if args.vtable:
-        call(["cp", absolute_path("forms/vtable_based/vtable_util.hh"), args.handle_folder + "/"])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_based', 'vtable_util.hh'), args.handle_folder])
     else:
-        call(["cp", absolute_path("forms/inheritance_based/util.hh"), args.handle_folder + "/"])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'inheritance_based', 'util.hh'), args.handle_folder])
 
     if args.vtable:
         if args.copy_on_write:
-            args.handle_headers = absolute_path('headers/vtable_cow.hpp')
+            args.handle_headers = os.path.join(os.path.dirname(__file__), 'headers', 'vtable_cow.hpp')
         else:
-            args.handle_headers = absolute_path('headers/vtable.hpp')
+            args.handle_headers = os.path.join(os.path.dirname(__file__), 'headers', 'vtable.hpp')
     else:
         if args.copy_on_write and args.small_buffer_optimization:
-            args.handle_headers = absolute_path('headers/sbo_cow_handle.hpp')
+            args.handle_headers = os.path.join(os.path.dirname(__file__), 'headers', 'sbo_cow_handle.hpp')
         else:
-            args.handle_headers = absolute_path('headers/handle.hpp')
+            args.handle_headers = os.path.join(os.path.dirname(__file__), 'headers', 'handle.hpp')
     args.handle_form = get_handle_form(args)
     args.interface_form = get_interface_form(args)
 
