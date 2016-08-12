@@ -335,8 +335,8 @@ def get_type_erased_function_pointer_type(function):
     for argument in split_arguments:
         if len(argument) > 0:
             ptr_type = ptr_type.replace(' ' + trim(argument), '')
-    if function.is_const and trim(ptr_type).endswith(trim(function.const_qualifier)):
-        ptr_type = trim(ptr_type[:-len(function.const_qualifier)])
+    if function.is_const:
+        ptr_type = re.sub('\)\s*const(\s+noexcept)\s*', ') noexcept', ptr_type)
     return ptr_type
 
 
@@ -349,8 +349,8 @@ def get_execution_wrapper_function_type(function):
     for argument in split_arguments:
         if len(argument) > 0:
             ptr_type = ptr_type.replace(' ' + trim(argument), '')
-    if function.is_const and ptr_type.endswith(trim(function.const_qualifier)):
-        ptr_type = trim(ptr_type[:-len(trim(function.const_qualifier))])
+    if function.is_const:
+        ptr_type = re.sub('\)\s*const(\s+noexcept)\s*', ') noexcept', ptr_type)
     return ptr_type
 
 
@@ -408,10 +408,9 @@ class VTableExecutionWrapperFileWriter(FormFileWriter):
         else:
             start_of_function_definition += ' '
 
+        end_of_signature = function.signature[index + 2:]
         if function.is_const:
-            end_of_signature = function.signature[index+2:-len(function.const_qualifier)]
-        else:
-            end_of_signature = function.signature[index+2:]
+            end_of_signature = re.sub('\)\s*const(\s+noexcept)\s*', ') noexcept', end_of_signature)
 
         start_of_function_definition += \
             end_of_signature + '\n' + \
