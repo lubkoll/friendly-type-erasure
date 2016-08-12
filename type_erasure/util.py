@@ -131,11 +131,11 @@ def unify_signature(function):
     function = re.sub('\([\s+]', '(',function)
     function = re.sub('[\s+]\)', ') ',function)
     function = re.sub('\)[\s+]', ') ',function)
-    function = re.sub('class ','',function)
-    function = re.sub('struct ','',function)
+    function = re.sub('class\s+','',function)
+    function = re.sub('struct\s+','',function)
     function = re.sub(';','',function)
     function = re.sub('{','',function)
-    return function.strip(' \n\r\t')
+    return trim(function)
 
 
 def same_signature(function, other_function):

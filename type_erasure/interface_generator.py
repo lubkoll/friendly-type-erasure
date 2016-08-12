@@ -27,8 +27,6 @@ def add_arguments(parser):
     parser.add_argument('--interface-file', type=str, required=False, help='write output to given file')
     parser.add_argument('-cow', '--copy-on-write', nargs='?', type=str, required=False,
                         const=True, default=False)
-#    parser.add_argument('--interface-form', type=str, required=True,
-#                        help='form used to generate code for the type-erased interface (constructors, assignment operators, ...)')
     parser.add_argument('--headers', type=str, required=False,
                         help='file containing headers to prepend to the generated code')
     parser.add_argument('--header-only', action='store_true',
