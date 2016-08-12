@@ -2,7 +2,7 @@
 {
 public:
     // Contructors
-    %struct_name%( );
+    %struct_name%( ) noexcept;
 
     template <typename T,
               typename std::enable_if< !std::is_same<%struct_name%, typename std::decay<T>::type>::value >::type* = nullptr>

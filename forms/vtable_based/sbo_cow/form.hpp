@@ -67,7 +67,7 @@ public:
     %member_functions%
 
 private:
-    void* read( ) const;
+    void* read( ) const noexcept;
 
     void* write( );
 

@@ -4,7 +4,7 @@
 
 public:
     // Contructors
-    %struct_name%( ) :
+    %struct_name%( ) noexcept :
         impl_ ( nullptr )
     { }
 
@@ -121,7 +121,7 @@ public:
     %member_functions%
 
 private:
-    void reset( )
+    void reset( ) noexcept
     {
         if( impl_ && type_erasure_vtable_detail::is_heap_allocated( impl_, buffer_ ) )
             vtable_.del( impl_ );

@@ -40,7 +40,7 @@ public:
 
     %struct_name%& operator= ( %struct_name%&& other ) noexcept;
 
-    ~%struct_name% ( ) noexcept;
+    ~%struct_name% ( );
 
     /**
      * @brief Conversion of the stored implementation to @code T*@endcode.

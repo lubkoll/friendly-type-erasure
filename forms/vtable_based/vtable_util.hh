@@ -20,7 +20,7 @@ namespace type_erasure_vtable_detail
     }
 
     template< class T, class Buffer >
-    inline void* clone_into_buffer( void* impl, Buffer& buffer ) noexcept
+    inline void* clone_into_buffer( void* impl, Buffer& buffer ) noexcept( std::is_nothrow_copy_constructible<T>::value )
     {
         assert(impl);
         new (&buffer) T( *static_cast<T*>( impl ) );
@@ -28,7 +28,7 @@ namespace type_erasure_vtable_detail
     }
 
     template< class T, class Buffer >
-    inline void clone_into_buffer( void* impl, Buffer& buffer, std::shared_ptr<void>& impl_ ) noexcept
+    inline void clone_into_buffer( void* impl, Buffer& buffer, std::shared_ptr<void>& impl_ ) noexcept( std::is_nothrow_copy_constructible<T>::value )
     {
         assert(impl);
         new (&buffer) T( *static_cast<T*>( impl ) );
@@ -43,7 +43,7 @@ namespace type_erasure_vtable_detail
     }
 
     template < class T >
-    inline T* cast_impl( void* impl )
+    inline T* cast_impl( void* impl ) noexcept
     {
         assert(impl);
         if( impl )
@@ -52,7 +52,7 @@ namespace type_erasure_vtable_detail
     };
 
     template < class T >
-    inline const T* cast_impl( const void* impl )
+    inline const T* cast_impl( const void* impl ) noexcept
     {
         assert(impl);
         if( impl )

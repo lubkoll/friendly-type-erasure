@@ -1,4 +1,4 @@
-%struct_name%::%struct_name% ( ) :
+%struct_name%::%struct_name% ( ) noexcept :
     impl_ ( nullptr )
 { }
 

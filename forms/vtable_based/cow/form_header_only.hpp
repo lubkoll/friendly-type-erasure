@@ -21,10 +21,7 @@ public:
               typename std::enable_if< !std::is_same<%struct_name%, typename std::decay<T>::type>::value >::type* = nullptr>
     %struct_name%& operator= ( T&& value )
     {
-        using std::swap;
-        %struct_name% temp( std::forward<T>(value) );
-        swap( temp, *this );
-        return *this;
+        return *this = %struct_name%( std::forward<T>(value) );
     }
 
     /**

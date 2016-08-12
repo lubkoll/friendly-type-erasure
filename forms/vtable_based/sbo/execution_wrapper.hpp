@@ -2,12 +2,12 @@ namespace %namespace_prefix%
 {
     template <class Buffer>
     struct vtable {
-        using void_function_type = void(*)(void*);
+        using delete_function_type = void(*)(void*) noexcept;
         using clone_function_type = void*(*)(void*);
         using clone_into_function_type = void*(*)(void*, Buffer&);
         %member_function_signatures%
 
-        void_function_type del;
+        delete_function_type del;
         clone_function_type clone;
         clone_into_function_type clone_into;
         %member_function_pointers%

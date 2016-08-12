@@ -96,7 +96,7 @@ public:
     %member_functions%
 
 private:
-    void* read( ) const
+    void* read( ) const noexcept
     {
         return impl_.get( );
     }

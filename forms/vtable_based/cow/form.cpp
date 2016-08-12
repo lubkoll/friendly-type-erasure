@@ -5,7 +5,7 @@
 
 %member_functions%
 
-void* %struct_name%::read( ) const
+void* %struct_name%::read( ) const noexcept
 {
     return impl_.get( );
 }

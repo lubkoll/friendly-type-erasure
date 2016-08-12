@@ -54,7 +54,7 @@
     return *this;
 }
 
-%struct_name%::~%struct_name% ( ) noexcept
+%struct_name%::~%struct_name% ( )
 {
     if( impl_ && type_erasure_vtable_detail::is_heap_allocated( impl_, buffer_ ) )
         vtable_.del( impl_ );
