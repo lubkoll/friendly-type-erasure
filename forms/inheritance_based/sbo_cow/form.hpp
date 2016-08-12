@@ -58,16 +58,15 @@ public:
     T* target( )
     {
         assert( handle_ );
-        void* buffer_ptr = type_erasure_detail::get_buffer_ptr<typename std::decay<T>::type>( const_cast<Buffer&>(buffer_) );
-        if( buffer_ptr )
+        if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
         {
-            auto handle = dynamic_cast<StackAllocatedHandle<T>*>( handle_ );
+            auto handle = dynamic_cast<HeapAllocatedHandle<T>*>( handle_ );
             if( handle )
                 return &handle->value_;
         }
         else
         {
-            auto handle = dynamic_cast<HeapAllocatedHandle<T>*>( handle_ );
+            auto handle = dynamic_cast<StackAllocatedHandle<T>*>( handle_ );
             if( handle )
                 return &handle->value_;
         }
@@ -84,16 +83,15 @@ public:
     const T* target() const
     {
         assert( handle_ );
-        void* buffer_ptr = type_erasure_detail::get_buffer_ptr<typename std::decay<T>::type>( const_cast<Buffer&>(buffer_) );
-        if( buffer_ptr )
+        if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
         {
-            auto handle = dynamic_cast<StackAllocatedHandle<T>*>(handle_);
+            auto handle = dynamic_cast<const HeapAllocatedHandle<T>*>(handle_);
             if( handle )
                 return &handle->value_;
         }
         else
         {
-            auto handle = dynamic_cast<HeapAllocatedHandle<T>*>(handle_);
+            auto handle = dynamic_cast<const StackAllocatedHandle<T>*>(handle_);
             if( handle )
                 return &handle->value_;
         }

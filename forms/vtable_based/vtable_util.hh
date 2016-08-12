@@ -1,18 +1,10 @@
 #pragma once
 
+#include <iostream>
+#include <memory>
+
 namespace type_erasure_vtable_detail
 {
-    template <class T, class Buffer>
-    inline void* get_buffer_ptr ( Buffer& buffer ) noexcept
-    {
-        void* buffer_ptr = &buffer;
-        auto buffer_size = sizeof(buffer);
-        return std::align( alignof(T),
-                           sizeof(T),
-                           buffer_ptr,
-                           buffer_size);
-    }
-
     template < class T >
     inline void* clone_impl ( void* impl )
     {
@@ -31,18 +23,16 @@ namespace type_erasure_vtable_detail
     inline void* clone_into_buffer( void* impl, Buffer& buffer ) noexcept
     {
         assert(impl);
-        auto buffer_ptr = get_buffer_ptr<T>( buffer );
-        new (buffer_ptr) T( *static_cast<T*>( impl ) );
-        return buffer_ptr;
+        new (&buffer) T( *static_cast<T*>( impl ) );
+        return &buffer;
     }
 
     template< class T, class Buffer >
     inline void clone_into_buffer( void* impl, Buffer& buffer, std::shared_ptr<void>& impl_ ) noexcept
     {
         assert(impl);
-        auto buffer_ptr = get_buffer_ptr<T>( buffer );
-        new (buffer_ptr) T( *static_cast<T*>( impl ) );
-	impl_ = std::shared_ptr<T>( std::shared_ptr<T>( nullptr ), static_cast<T*>( buffer_ptr ) );
+        new (&buffer) T( *static_cast<T*>( impl ) );
+	impl_ = std::shared_ptr<T>( std::shared_ptr<T>( nullptr ), static_cast<T*>( static_cast<void*>( &buffer ) ) );
     }
 
     template < class T >

@@ -4,12 +4,10 @@ namespace %namespace_prefix%
     struct vtable {
         using clone_function_type = void(*)(void*, std::shared_ptr<void>&);
         using clone_into_function_type = void(*)(void*, Buffer&, std::shared_ptr<void>&);
-        using align_buffer_function_type = void*(*)(Buffer&);
         %member_function_signatures%
 
         clone_function_type clone;
         clone_into_function_type clone_into;
-        align_buffer_function_type align_buffer;
         %member_function_pointers%
     };
 

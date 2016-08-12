@@ -22,7 +22,7 @@ public:
 
     %struct_name% ( const %struct_name%& other ) :
         handle_ (
-            !other.handle_ || type_erasure_detail::heap_allocated( other.handle_, other.buffer_ ) ?
+            !other.handle_ || type_erasure_detail::is_heap_allocated( other.handle_, other.buffer_ ) ?
             other.handle_ :
             type_erasure_detail::handle_ptr< HandleBase<Buffer> >(
                 type_erasure_detail::char_ptr( &buffer_ ) + type_erasure_detail::handle_offset( other.handle_, other.buffer_ )
@@ -91,16 +91,15 @@ public:
     T* target( )
     {
         assert( handle_ );
-        void* buffer_ptr = type_erasure_detail::get_buffer_ptr<typename std::decay<T>::type>( const_cast<Buffer&>(buffer_) );
-        if( buffer_ptr )
+        if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
         {
-            auto handle = dynamic_cast<StackAllocatedHandle<T>*>( handle_ );
+            auto handle = dynamic_cast<HeapAllocatedHandle<T>*>( handle_ );
             if( handle )
                 return &handle->value_;
         }
         else
         {
-            auto handle = dynamic_cast<HeapAllocatedHandle<T>*>( handle_ );
+            auto handle = dynamic_cast<StackAllocatedHandle<T>*>( handle_ );
             if( handle )
                 return &handle->value_;
         }
@@ -117,16 +116,15 @@ public:
     const T* target() const
     {
         assert( handle_ );
-        void* buffer_ptr = type_erasure_detail::get_buffer_ptr<typename std::decay<T>::type>( const_cast<Buffer&>(buffer_) );
-        if( buffer_ptr )
+        if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
         {
-            auto handle = dynamic_cast<StackAllocatedHandle<T>*>(handle_);
+            auto handle = dynamic_cast<const HeapAllocatedHandle<T>*>(handle_);
             if( handle )
                 return &handle->value_;
         }
         else
         {
-            auto handle = dynamic_cast<HeapAllocatedHandle<T>*>(handle_);
+            auto handle = dynamic_cast<const StackAllocatedHandle<T>*>(handle_);
             if( handle )
                 return &handle->value_;
         }
@@ -140,8 +138,8 @@ private:
     void swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer ) noexcept
     {
         using namespace type_erasure_detail;
-        const bool this_heap_allocated = heap_allocated( handle_, buffer_ );
-        const bool other_heap_allocated = heap_allocated( other_handle, other_buffer );
+        const bool this_heap_allocated = is_heap_allocated( handle_, buffer_ );
+        const bool other_heap_allocated = is_heap_allocated( other_handle, other_buffer );
 
         if ( this_heap_allocated && other_heap_allocated ) {
             std::swap( handle_, other_handle );

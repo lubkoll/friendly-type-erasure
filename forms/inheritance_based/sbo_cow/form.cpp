@@ -1,6 +1,6 @@
 %struct_name%::%struct_name% ( const %struct_name%& other ) :
     handle_ (
-        !other.handle_ || type_erasure_detail::heap_allocated( other.handle_, other.buffer_ ) ?
+        !other.handle_ || type_erasure_detail::is_heap_allocated( other.handle_, other.buffer_ ) ?
         other.handle_ :
         type_erasure_detail::handle_ptr< HandleBase<Buffer> >(
             type_erasure_detail::char_ptr( &buffer_ ) + type_erasure_detail::handle_offset( other.handle_, other.buffer_ )
@@ -48,8 +48,8 @@
 void %struct_name%::swap ( HandleBase<Buffer>*& other_handle, Buffer& other_buffer ) noexcept
 {
     using namespace type_erasure_detail;
-    const auto this_heap_allocated = heap_allocated( handle_, buffer_ );
-    const auto other_heap_allocated = heap_allocated( other_handle, other_buffer );
+    const auto this_heap_allocated = is_heap_allocated( handle_, buffer_ );
+    const auto other_heap_allocated = is_heap_allocated( other_handle, other_buffer );
 
     if ( this_heap_allocated && other_heap_allocated ) {
         std::swap( handle_, other_handle );

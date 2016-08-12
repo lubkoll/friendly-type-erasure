@@ -82,10 +82,9 @@ public:
     template <typename T>
     T* target( )
     {
-        auto buffer_ptr = type_erasure_detail::get_buffer_ptr<typename std::decay<T>::type>( const_cast<Buffer&>(buffer_) );
-        if( buffer_ptr )
-            return type_erasure_detail::cast< T, StackAllocatedHandle<T> >( handle_ );
-        return type_erasure_detail::cast< T, HeapAllocatedHandle<T> >( handle_ );
+        if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
+            return type_erasure_detail::cast< T, HeapAllocatedHandle<T> >( handle_ );
+        return type_erasure_detail::cast< T, StackAllocatedHandle<T> >( handle_ );
     }
 
     /**
@@ -96,10 +95,9 @@ public:
     template <typename T>
     const T* target( ) const
     {
-        auto buffer_ptr = type_erasure_detail::get_buffer_ptr<typename std::decay<T>::type>( const_cast<Buffer&>(buffer_) );
-        if( buffer_ptr )
-            return type_erasure_detail::cast< const T, const StackAllocatedHandle<T> >( handle_ );
-        return type_erasure_detail::cast< const T, const HeapAllocatedHandle<T> >( handle_ );
+        if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
+            return type_erasure_detail::cast< const T, const HeapAllocatedHandle<T> >( handle_ );
+        return type_erasure_detail::cast< const T, const StackAllocatedHandle<T> >( handle_ );
     }
 
     %nonvirtual_members%

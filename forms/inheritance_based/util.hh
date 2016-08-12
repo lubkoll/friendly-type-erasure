@@ -16,18 +16,6 @@ namespace type_erasure_detail
         return nullptr;
     }
 
-    template <class T, class Buffer>
-    inline void* get_buffer_ptr ( Buffer& buffer )
-    {
-        void* buffer_ptr = &buffer;
-        auto buffer_size = sizeof(buffer);
-        return std::align( alignof(T),
-                           sizeof(T),
-                           buffer_ptr,
-                           buffer_size);
-
-    }
-
     template <class HandleBase,
               class StackAllocatedHandle,
               class HeapAllocatedHandle,
@@ -36,10 +24,9 @@ namespace type_erasure_detail
     {
         using PlainType = typename std::decay<T>::type;
 
-        void* buf_ptr = get_buffer_ptr<PlainType>(buffer);
-        if (buf_ptr) {
-            new (buf_ptr) StackAllocatedHandle( std::forward<T>(value) );
-            return static_cast<HandleBase*>(buf_ptr);
+        if ( sizeof( StackAllocatedHandle ) <= sizeof( Buffer ) ) {
+            new (&buffer) StackAllocatedHandle( std::forward<T>(value) );
+            return static_cast<HandleBase*>( static_cast<void*>(&buffer) );
         }
 
         return new HeapAllocatedHandle( std::forward<T>(value) );
@@ -77,7 +64,7 @@ namespace type_erasure_detail
     }
 
     template <class HandleBase, class Buffer>
-    inline bool heap_allocated ( const HandleBase* handle, const Buffer& buffer ) noexcept
+    inline bool is_heap_allocated ( const HandleBase* handle, const Buffer& buffer ) noexcept
     {
         return handle < handle_ptr<HandleBase>( char_ptr(&buffer) ) ||
                handle_ptr<HandleBase>( char_ptr(&buffer) + sizeof(buffer) ) <= handle;

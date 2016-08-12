@@ -5,13 +5,11 @@ namespace %namespace_prefix%
         using void_function_type = void(*)(void*);
         using clone_function_type = void*(*)(void*);
         using clone_into_function_type = void*(*)(void*, Buffer&);
-        using align_buffer_function_type = void*(*)(Buffer&);
         %member_function_signatures%
 
         void_function_type del;
         clone_function_type clone;
         clone_into_function_type clone_into;
-        align_buffer_function_type align_buffer;
         %member_function_pointers%
     };
 

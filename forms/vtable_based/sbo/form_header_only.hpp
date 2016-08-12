@@ -15,19 +15,14 @@ public:
             &type_erasure_vtable_detail::delete_impl< typename std::decay<T>::type >,
             &type_erasure_vtable_detail::clone_impl< typename std::decay<T>::type >,
             &type_erasure_vtable_detail::clone_into_buffer< typename std::decay<T>::type, Buffer >,
-            &type_erasure_vtable_detail::get_buffer_ptr< typename std::decay<T>::type, Buffer >,
 	    %member_function_vtable_initialization%
         }),
         impl_ ( nullptr )
     {
-        void* buffer_ptr = &buffer_;
-        auto buffer_size = sizeof(Buffer);
-        std::align( alignof(T), sizeof(T), buffer_ptr, buffer_size );
-
-        if( sizeof( typename std::decay<T>::type ) <= buffer_size )
+        if( sizeof( typename std::decay<T>::type ) <= sizeof( Buffer ) )
         {
-            new (buffer_ptr) typename std::decay<T>::type( std::forward<T>(value) );
-            impl_ = buffer_ptr;
+            new (&buffer_) typename std::decay<T>::type( std::forward<T>(value) );
+            impl_ = &buffer_;
         }
         else
             impl_ = new typename std::decay<T>::type( std::forward<T>(value) );
@@ -53,7 +48,7 @@ public:
         else
         {
             buffer_ = std::move( other.buffer_ );
-            impl_ = vtable_.align_buffer( buffer_ );
+            impl_ = &buffer_;
         }
 
         other.impl_ = nullptr;
@@ -88,7 +83,7 @@ public:
         else
         {
             buffer_ = std::move( other.buffer_ );
-            impl_  = vtable_.align_buffer( buffer_ );
+            impl_  = &buffer_;
         }
 
         other.impl_ = nullptr;
