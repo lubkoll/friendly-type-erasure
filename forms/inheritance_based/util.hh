@@ -2,10 +2,17 @@
 
 #include <cassert>
 #include <cstddef>
-#include <memory>
+#include <type_traits>
 
 namespace type_erasure_detail
-{    
+{ 
+    template <class T>
+    constexpr bool is_nothrow_constructible( ) noexcept
+    {
+        return ( std::is_rvalue_reference<T>::value && std::is_nothrow_move_constructible<typename std::decay<T>::type>::value ) ||
+               ( std::is_lvalue_reference<T>::value && std::is_nothrow_copy_constructible<typename std::decay<T>::type>::value );
+    }
+   
     template <class T, class Derived, class Base>
     inline T* cast ( Base* base ) noexcept
     {

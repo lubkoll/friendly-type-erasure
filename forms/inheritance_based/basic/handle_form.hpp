@@ -14,14 +14,13 @@ namespace %namespace_prefix%
         template <typename U,
                   typename std::enable_if< std::is_same< typename std::remove_const<T>::type, 
                                                          typename std::decay<U>::type& >::value >::type* = nullptr >
-        explicit Handle( U&& value ) noexcept
+        explicit Handle( U&& value ) noexcept( type_erasure_detail::is_nothrow_constructible<U>( ) )
             : value_( std::forward<U>(value) )
         {}
 
         template <typename U,
                   typename std::enable_if< std::is_same< T, typename std::decay<U>::type >::value >::type* = nullptr >
-        explicit Handle( U&& value ) noexcept ( std::is_rvalue_reference< decltype(value) >::value &&
-                                                std::is_nothrow_move_constructible< typename std::decay<U>::type >::value )
+        explicit Handle( U&& value ) noexcept( type_erasure_detail::is_nothrow_constructible<U>( ) )
             : value_( std::forward<U>(value) )
         {}
 

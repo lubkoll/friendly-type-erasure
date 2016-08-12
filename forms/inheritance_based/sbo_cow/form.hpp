@@ -55,7 +55,7 @@ public:
      *         was successful, else nullptr
      */
     template <typename T>
-    T* target( )
+    T* target( ) noexcept
     {
         assert( handle_ );
         if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
@@ -80,7 +80,7 @@ public:
      *         was successful, else nullptr
      */
     template <typename T>
-    const T* target() const
+    const T* target() const noexcept
     {
         assert( handle_ );
         if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )

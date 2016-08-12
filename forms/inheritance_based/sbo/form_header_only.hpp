@@ -80,7 +80,7 @@ public:
      *         was successful, else nullptr
      */
     template <typename T>
-    T* target( )
+    T* target( ) noexcept
     {
         if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
             return type_erasure_detail::cast< T, HeapAllocatedHandle<T> >( handle_ );
@@ -93,7 +93,7 @@ public:
      *         was successful, else nullptr
      */
     template <typename T>
-    const T* target( ) const
+    const T* target( ) const noexcept
     {
         if( type_erasure_detail::is_heap_allocated( handle_, buffer_ ) )
             return type_erasure_detail::cast< const T, const HeapAllocatedHandle<T> >( handle_ );
