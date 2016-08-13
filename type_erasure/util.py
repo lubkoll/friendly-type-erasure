@@ -3,16 +3,7 @@ import clang
 import os
 import re
 
-from clang.cindex import CursorKind
-from clang.cindex import TranslationUnit
 from parser_addition import extract_include_guard, trim
-
-
-open_brace = '{'
-semicolon = ';'
-close_paren = ')'
-const_token = 'const'
-comma = ','
 
 
 def trim(string):
@@ -39,52 +30,6 @@ class client_data:
         self. indent = ''
         self.impl_ending = ''
         self.current_cursor = None
-
-
-def is_class(kind):
-    return kind == CursorKind.CLASS_DECL or \
-                    kind == CursorKind.STRUCT_DECL or \
-                    kind == CursorKind.CLASS_TEMPLATE or \
-                    kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
-
-
-def is_namespace(kind):
-    return kind == CursorKind.NAMESPACE
-
-
-def is_function(kind):
-    return kind == CursorKind.CXX_METHOD or \
-                    kind == CursorKind.CONVERSION_FUNCTION
-
-def is_template(kind):
-    return kind == CursorKind.CLASS_TEMPLATE or \
-                    kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION or \
-                    kind == CursorKind.FUNCTION_TEMPLATE
-
-class child_visit:
-    Break = 0
-    Continue = 1
-    Recurse = 2
-
-
-def get_tokens(tu, cursor):
-    return [x for x in tu.get_tokens(extent=cursor.extent)]
-
-
-def class_prefix(translation_unit, class_cursor):
-    retval = ''
-    tokens = get_tokens(translation_unit, class_cursor)
-    open_brace = '{'
-
-    for i in range(len(tokens)):
-        spelling = tokens[i].spelling
-        if spelling == open_brace:
-            break
-        elif i:
-            retval += ' '
-        retval += spelling
-
-    return retval
 
 
 def prepare_form_impl (form):
@@ -114,27 +59,18 @@ def print_diagnostic(diag):
     os.write(2, '{file_}:{line}:{column} {severity}: {spelling}\n'.format(**locals()))
 
 
-def print_function(fun):
-    print "Function:"
-    print 'signature: \t\t' + fun.signature
-    print 'name: \t\t\t' + fun.name
-    print 'arg names: \t\t' + fun.argument_names
-    print 'return str: \t\t' + fun.return_str
-    print 'const qualifier: \t' + fun.const_qualifier
-    print ''
-
-
 def unify_signature(function):
-    function = re.sub('[\s+]\&[\s+]', '& ',function)
-    function = re.sub('[\s+]\*[\s+]', '* ',function)
-    function = re.sub('[\s+]\(', '(',function)
-    function = re.sub('\([\s+]', '(',function)
-    function = re.sub('[\s+]\)', ') ',function)
-    function = re.sub('\)[\s+]', ') ',function)
+    function = re.sub('\s*\&\s*', '& ',function)
+    function = re.sub('\s*\<\s*', '\<',function)
+    function = re.sub('\s*\>\s*', '\>',function)
+    function = re.sub('\s*\*\s*', '* ',function)
+    function = re.sub('\s*\(\s*', '(',function)
+    function = re.sub('\s*]\)\s*', ') ',function)
     function = re.sub('class\s+','',function)
     function = re.sub('struct\s+','',function)
     function = re.sub(';','',function)
     function = re.sub('{','',function)
+    function = re.sub('\n','',function)
     return trim(function)
 
 
@@ -179,7 +115,7 @@ def add_default_arguments(parser):
                         default='/usr/lib/llvm-3.8/lib',
                         help='path to libclang library')
     parser.add_argument('clang_args', metavar='Clang-arg', type=str, nargs=argparse.REMAINDER,
-                        default='-std=c++11',
+                        default='-std=c++14',
                         help='additional args to pass to Clang')
     parser.add_argument('file', type=str, help='the input file containing archetypes')
     parser.add_argument('--handle-namespace', nargs='?', type=str, required=False,

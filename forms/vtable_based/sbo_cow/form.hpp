@@ -3,6 +3,7 @@
     using Buffer = std::array<char, %buffer_size%>;
 
 public:
+    %type_aliases%
     // Contructors
     %struct_name%( ) noexcept;
 

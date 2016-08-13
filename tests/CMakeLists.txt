@@ -26,6 +26,8 @@ aux_source_directory(gen/vtable_sbo_header_only SRC_LIST)
 aux_source_directory(gen/vtable_sbo_cow SRC_LIST)
 aux_source_directory(gen/vtable_sbo_cow_header_only SRC_LIST)
 
+aux_source_directory(gen/test SRC_LIST)
+
 add_executable(unit_tests ${SRC_LIST})
 target_link_libraries(unit_tests ${GTEST_LIBRARIES} pthread)
 
