@@ -22,7 +22,7 @@ def ltrim(string):
 
 
 def is_single_line_comment(line):
-    single_line_comments = ["//", "///", "//!"]
+    single_line_comments = ["///", "//!"]
     line = trim(line)
     for prefix in single_line_comments:
         if line.startswith(prefix):

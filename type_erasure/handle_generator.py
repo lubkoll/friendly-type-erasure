@@ -4,17 +4,13 @@ import argparse
 import clang
 from util import add_default_arguments, close_namespaces, parse_default_args, client_data, prepare_form
 from parser_addition import extract_includes
-from file_writer import HandleFileWriter
-from file_writer import VTableExecutionWrapperFileWriter
+from handle_file_writer import HandleFileWriter
+from execution_wrapper_file_writer import VTableExecutionWrapperFileWriter
 from file_parser import GenericFileParser
 
 
 def add_arguments(parser):
-#    parser.add_argument('--handle-form', type=str, required=True,
-#                        help='form used to generate code for handles')
     parser.add_argument('--handle-file', type=str, required=False, help='write output to given file')
-#    parser.add_argument('--handle-headers', type=str, required=False, help='headers for the handle file',
-#                        default='')
 
 
 def create_parser():

@@ -7,6 +7,7 @@
     using HeapAllocatedHandle = Handle<T,Buffer,true>;
 
 public:
+    %type_aliases%
     // Contructors
     %struct_name% () noexcept = default;
 

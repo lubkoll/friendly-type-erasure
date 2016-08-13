@@ -1,6 +1,7 @@
 %struct_prefix%
 {
 public:
+    %type_aliases%
     // Contructors
     %struct_name%( ) noexcept;
 

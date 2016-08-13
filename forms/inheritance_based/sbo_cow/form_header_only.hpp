@@ -7,9 +7,10 @@
     using HeapAllocatedHandle = Handle<T, Buffer, true>;
 
 public:
+    %type_aliases%
+    // Constructors
     %struct_name% ( ) noexcept = default;
 
-    // Constructors
     template <typename T,
               typename std::enable_if<
                   !std::is_same< %struct_name%, typename std::decay<T>::type >::value
