@@ -53,7 +53,7 @@ class VTableExecutionWrapperFileWriter(file_writer.FormFileWriter):
     def process_open_class(self, data):
         self.lines = data.handle_form_lines
         self.expansion_lines = find_expansion_lines_for_vtable_execution_wrapper_file_writer(self.lines)
-        self.namespace =file_writer.get_handle_namespace(data)
+        self.namespace =file_writer.get_detail_namespace(data)
 
         self.lines = map(
             lambda line: line.format(

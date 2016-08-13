@@ -108,9 +108,9 @@ def add_default_arguments(parser):
     parser.add_argument('--indent', nargs='?', type=int,
                         const=4, default=4,
                         help='number of spaces for indentation')
-    parser.add_argument('--handle-extension', nargs='?', type=str,
+    parser.add_argument('--detail-extension', nargs='?', type=str,
                         default='Handles',
-                        help='ending for namespace containing the handle implementation (not considered if --handle-namespace is specified)')
+                        help='ending for namespace containing the handle or function pointer table implementation (not considered if --detail-namespace is specified)')
     parser.add_argument('--clang-path', type=str, required=False,
                         default='/usr/lib/llvm-3.8/lib',
                         help='path to libclang library')
@@ -118,17 +118,17 @@ def add_default_arguments(parser):
                         default='-std=c++14',
                         help='additional args to pass to Clang')
     parser.add_argument('file', type=str, help='the input file containing archetypes')
-    parser.add_argument('--handle-namespace', nargs='?', type=str, required=False,
+    parser.add_argument('--detail-namespace', nargs='?', type=str, required=False,
                         default='',
-                        help='namespace containing the handle implementations')
+                        help='namespace containing implementations of handles, resp tables for the function pointers')
     parser.add_argument('--vtable', action='store_true',
                         help='use vtable-based type erasure')
 
 def parse_default_args(args, data):
     data.non_copyable = args.non_copyable
     data.indent = args.indent
-    data.handle_extension = args.handle_extension
-    data.handle_namespace = args.handle_namespace
+    data.detail_extension = args.detail_extension
+    data.detail_namespace = args.detail_namespace
     data.file = args.file
     data.vtable = args.vtable
     data.clang_args = args.clang_args

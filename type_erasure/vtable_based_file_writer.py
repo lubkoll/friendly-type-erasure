@@ -31,7 +31,7 @@ def find_expansion_lines_for_vtable_interface_file_writer(lines):
 
 class HeaderOnlyVTableInterfaceFileWriter(file_writer.CppFileWriter):
     def __init__(self, filename, base_indent, comments=None):
-        self.handle_namespace = ''
+        self.detail_namespace = ''
         self.lines = None
         self.expansion_lines = None
         self.namespace = ''
@@ -42,7 +42,7 @@ class HeaderOnlyVTableInterfaceFileWriter(file_writer.CppFileWriter):
 
     def process_open_class(self, data):
         super(HeaderOnlyVTableInterfaceFileWriter, self).process_open_class(data)
-        self.namespace = file_writer.get_handle_namespace(data)
+        self.namespace = file_writer.get_detail_namespace(data)
         self.lines = data.interface_form_lines
         self.expansion_lines = find_expansion_lines_for_vtable_interface_file_writer(self.lines)
 

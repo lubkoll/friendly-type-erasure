@@ -42,7 +42,7 @@ class HandleFileWriter(file_writer.FormFileWriter):
 
     def process_open_class(self, data):
         self.lines = data.handle_form_lines
-        self.namespace = file_writer.get_handle_namespace(data)
+        self.namespace = file_writer.get_detail_namespace(data)
 
         self.lines = map(
             lambda line: line.format(

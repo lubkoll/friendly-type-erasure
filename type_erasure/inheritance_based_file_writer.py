@@ -25,7 +25,7 @@ def find_expansion_lines_for_interface_file_writer(lines):
 
 class HeaderOnlyInterfaceFileWriter(file_writer.CppFileWriter):
     def __init__(self, filename, base_indent, comments=None):
-        self.handle_namespace = ''
+        self.detail_namespace = ''
         self.lines = None
         self.expansion_lines = None
         self.type_aliases_identifier = '{type_aliases}'
@@ -36,7 +36,7 @@ class HeaderOnlyInterfaceFileWriter(file_writer.CppFileWriter):
         super(HeaderOnlyInterfaceFileWriter, self).process_open_class(data)
 
         self.lines = data.interface_form_lines
-        self.handle_namespace = file_writer.get_handle_namespace(data)
+        self.detail_namespace = file_writer.get_detail_namespace(data)
 
         comment = util.get_comment('', self.comments, self.current_struct_prefix)
 
@@ -92,10 +92,10 @@ class HeaderOnlyInterfaceFileWriter(file_writer.CppFileWriter):
             for split_line in split_lines:
                 if self.type_aliases_identifier in split_line:
                     continue
-                if self.handle_namespace != '':
+                if self.detail_namespace != '':
                     handle = file_writer.get_handle(split_line)
                     if handle is not None:
-                        new_handle = handle.replace('Handle', self.handle_namespace + '::Handle')
+                        new_handle = handle.replace('Handle', self.detail_namespace + '::Handle')
                         split_line = split_line.replace(handle, new_handle)
                 self.file_content.append(self.namespace_indent + split_line + '\n')
 
@@ -141,7 +141,7 @@ class InterfaceHeaderFileWriter(HeaderOnlyInterfaceFileWriter):
 
         self.lines = data.interface_form_lines
         self.expansion_lines = find_expansion_lines_for_interface_file_writer(self.lines)
-        self.handle_namespace = file_writer.get_handle_namespace(data)
+        self.detail_namespace = file_writer.get_detail_namespace(data)
 
         comment = util.get_comment('', self.comments, self.current_struct_prefix)
         if data.small_buffer_optimization:
@@ -190,7 +190,7 @@ class InterfaceSourceFileWriter(HeaderOnlyInterfaceFileWriter):
 
         self.lines = data.interface_cpp_form_lines
         self.expansion_lines = find_expansion_lines_for_interface_file_writer(self.lines)
-        self.handle_namespace = file_writer.get_handle_namespace(data)
+        self.detail_namespace = file_writer.get_detail_namespace(data)
 
         self.lines = map(
             lambda line: line.format(
