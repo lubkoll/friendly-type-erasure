@@ -37,6 +37,11 @@
         vtable_.del( impl_ );
 }
 
+%struct_name%::operator bool( ) const noexcept
+{
+    return impl_ != nullptr;
+}
+
 void* %struct_name%::clone ( ) const
 {
     if( impl_ )

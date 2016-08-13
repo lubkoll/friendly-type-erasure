@@ -38,6 +38,12 @@ public:
     ~%struct_name% ( );
 
     /**
+     * @brief Checks if the type-erased interface holds an implementation.
+     * @return true if an implementation is stored, else false
+     */
+    explicit operator bool( ) const noexcept;
+
+    /**
      * @brief Conversion of the stored implementation to @code T*@endcode.
      * @return pointer to stored object if conversion to @code T*@endcode
      *         was successful, else nullptr

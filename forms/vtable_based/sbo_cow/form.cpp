@@ -36,6 +36,11 @@
     return *this;
 }
 
+%struct_name%::operator bool( ) const noexcept
+{
+    return impl_ != nullptr;
+}
+
 %member_functions%
 
 void* %struct_name%::read( ) const noexcept

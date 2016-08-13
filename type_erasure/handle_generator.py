@@ -10,7 +10,9 @@ from file_parser import GenericFileParser
 
 
 def add_arguments(parser):
-    parser.add_argument('--handle-file', type=str, required=False, help='write output to given file')
+    parser.add_argument('--handle-file', nargs='?', type=str, required=False,
+                        default='handle.hh',
+                        help='write output to given file')
 
 
 def create_parser():

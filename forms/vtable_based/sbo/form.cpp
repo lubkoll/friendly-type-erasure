@@ -60,6 +60,11 @@
         vtable_.del( impl_ );
 }
 
+%struct_name%::operator bool( ) const noexcept
+{
+    return impl_ != nullptr;
+}
+
 %member_functions%
 
 void %struct_name%::reset( ) noexcept

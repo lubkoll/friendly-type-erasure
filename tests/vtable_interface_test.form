@@ -40,6 +40,19 @@ namespace
     }
 }
 
+TEST( Test%namespace_name%%class_name%, OperatorBool )
+{
+    %class_name% fooable;
+    bool valid( fooable );
+    EXPECT_FALSE( valid );
+    fooable = Mock%class_name%();
+    valid = bool( fooable );
+    EXPECT_TRUE( valid );
+    fooable = %class_name%();
+    valid = bool( fooable );
+    EXPECT_FALSE( valid );
+}
+
 TEST( Test%namespace_name%%class_name%, Empty )
 {
     %class_name% fooable;
