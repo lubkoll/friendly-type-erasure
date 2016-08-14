@@ -60,6 +60,9 @@ class GenericFileParser(object):
         if clang_util.is_static_or_global_variable(cursor.kind):
             self.processor.process_variable_declaration(self.data,cursor)
             return Continue
+        elif clang_util.is_enum(cursor.kind):
+            self.processor.process_enum(self.data,cursor)
+            return Continue
         elif clang_util.is_forward_declaration(self.data.tu, cursor):
             self.processor.process_forward_declaration(self.data,cursor)
             return Continue
@@ -158,6 +161,12 @@ class FileProcessor(object):
         pass
 
     def process_type_alias(self, data, cursor):
+        pass
+
+    def process_enum(self, data, cursor):
+        pass
+
+    def process_access_specifier(self, data, cursor):
         pass
 
     def write_to_file(self):

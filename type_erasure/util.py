@@ -66,10 +66,12 @@ def unify_signature(function):
     function = re.sub('\s*\*\s*', '* ',function)
     function = re.sub('\s*\(\s*', '(',function)
     function = re.sub('\s*]\)\s*', ') ',function)
+    function = re.sub('\s*\{\s*', '(',function)
+    function = re.sub('\s*\}\s*', ') ',function)
     function = re.sub('class\s+','',function)
     function = re.sub('struct\s+','',function)
     function = re.sub(';','',function)
-    function = re.sub('{','',function)
+    function = re.sub('\s*,\s*',',',function)
     function = re.sub('\n','',function)
     return trim(function)
 

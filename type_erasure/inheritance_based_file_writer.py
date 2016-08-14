@@ -23,7 +23,7 @@ def find_expansion_lines_for_interface_file_writer(lines):
     return retval
 
 
-class HeaderOnlyInterfaceFileWriter(file_writer.CppFileWriter):
+class HeaderOnlyInterfaceFileWriter(file_writer.FormFileWriter):
     def __init__(self, filename, base_indent, comments=None):
         self.detail_namespace = ''
         self.lines = None
@@ -101,36 +101,6 @@ class HeaderOnlyInterfaceFileWriter(file_writer.CppFileWriter):
 
         self.lines = None
         self.expansion_lines = None
-
-        super(HeaderOnlyInterfaceFileWriter,self).process_close_class()
-
-    def process_type_alias(self,data,cursor):
-        if self.expansion_lines is None:
-            super(HeaderOnlyInterfaceFileWriter,self).process_type_alias(data, cursor)
-            return
-        if self.expansion_lines[1][0] == -1:
-            return
-        alias_or_typedef = clang_util.get_type_alias_or_typedef(data.tu, cursor)
-        comment = util.get_comment(self.base_indent, self.comments, alias_or_typedef)
-        if '{type_aliases}' in self.lines[self.expansion_lines[1][0]]:
-            self.lines[self.expansion_lines[1][0]] = comment
-        else:
-            self.lines[self.expansion_lines[1][0]] += comment
-        self.lines[self.expansion_lines[1][0]] += self.class_indent + alias_or_typedef
-
-    def process_variable_declaration(self,data,cursor):
-        if self.expansion_lines is None :
-            super(HeaderOnlyInterfaceFileWriter,self).process_variable_declaration(data, cursor)
-            return
-        if self.expansion_lines[1][0] == -1:
-            return
-        variable_declaration = clang_util.get_variable_declaration(data.tu, cursor)
-        comment = util.get_comment(self.base_indent, self.comments, variable_declaration)
-        if '{type_aliases}' in self.lines[self.expansion_lines[1][0]]:
-            self.lines[self.expansion_lines[1][0]] = comment
-        else:
-            self.lines[self.expansion_lines[1][0]] += comment
-        self.lines[self.expansion_lines[1][0]] += self.class_indent + variable_declaration
 
 
 class InterfaceHeaderFileWriter(HeaderOnlyInterfaceFileWriter):

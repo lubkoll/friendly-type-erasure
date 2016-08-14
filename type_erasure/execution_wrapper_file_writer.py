@@ -74,6 +74,21 @@ class VTableExecutionWrapperFileWriter(file_writer.FormFileWriter):
 
         super(VTableExecutionWrapperFileWriter, self).process_open_class(data)
 
+    def process_close_class(self):
+        for line in self.lines:
+            newline = '\n'
+            single_lines = util.rtrim(line).split('\n')
+            for single_line in single_lines:
+                indent = self.namespace_indent
+                if single_line == '':
+                    indent = ''
+                self.file_content.append(indent + single_line + newline)
+
+        self.lines = None
+        self.expansion_lines = None
+
+        super(VTableExecutionWrapperFileWriter,self).process_close_class()
+
     def process_function(self, data, cursor):
         if self.lines[self.expansion_lines[0][0]] != '':
             self.lines[self.expansion_lines[0][0]] += '\n\n'

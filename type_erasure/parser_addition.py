@@ -105,8 +105,9 @@ def read_name(file, line):
 
 def read_comment_and_name(file, line):
     comment = Comment()
-    line = read_comment(file, line, comment.comment)
-    line = skip_empty_lines(file, line)
+    while is_comment(line,False):
+        line = read_comment(file, line, comment.comment)
+        line = skip_empty_lines(file, line)
     comment.name = read_name(file, line)
     return comment
 

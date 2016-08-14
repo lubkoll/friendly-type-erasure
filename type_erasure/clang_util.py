@@ -3,12 +3,14 @@ import re
 
 from clang.cindex import CursorKind
 from clang.cindex import TypeKind
+from util import trim
 
 
 semicolon = ';'
 close_paren = ')'
 const_token = 'const'
 open_brace = '{'
+close_brace = '}'
 open_bracket = '<'
 close_bracket = '>'
 comma = ','
@@ -90,6 +92,7 @@ def get_type_alias_or_typedef(translation_unit, cursor):
     if is_typedef(cursor.kind):
         return get_typedef(translation_unit, cursor)
 
+
 def get_variable_declaration(translation_unit, cursor):
     tokens = get_tokens(translation_unit, cursor)
     variable_declaration = ''
@@ -102,6 +105,36 @@ def get_variable_declaration(translation_unit, cursor):
         else:
             variable_declaration += spelling + ' '
     return variable_declaration
+
+
+def get_enum_definition(translation_unit, cursor):
+    tokens = get_tokens(translation_unit, cursor)
+    enum_definition = ''
+    for token in tokens:
+        enum_definition += token.spelling
+        if token == tokens[-1]:
+            enum_definition += '\n'
+        elif token != tokens[-2]:
+            enum_definition += ' '
+
+    return enum_definition
+
+
+def format_enum_definition(enum_indent, base_indent, enum_definition):
+    formatted_definition = ''
+    enum_prefix = trim(enum_definition.split(open_brace)[0])
+    formatted_definition += enum_indent + enum_prefix + '\n'
+    formatted_definition += enum_indent + open_brace
+
+    enum_definition = trim(trim(trim(enum_definition)[len(enum_prefix):])[1:])
+    enum_definition = enum_definition.replace('};','')
+    entries = enum_definition.split(comma)
+    for entry in entries:
+        if entry != entries[0]:
+            formatted_definition += comma
+        formatted_definition += '\n' + enum_indent + base_indent + trim(entry)
+    formatted_definition += '\n' + enum_indent + '};\n'
+    return formatted_definition
 
 
 def is_class(kind):
@@ -141,6 +174,14 @@ def is_typedef(kind):
 
 def is_static_or_global_variable(kind):
     return kind == CursorKind.VAR_DECL
+
+
+def is_enum(kind):
+    return kind == CursorKind.ENUM_DECL
+
+
+def is_access_specifier(kind):
+    return kind == CursorKind.CXX_ACCESS_SPEC_DECL
 
 
 def print_function(fun):
