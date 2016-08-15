@@ -7,8 +7,25 @@ addons:
     packages:
     - g++-5
     - gcc-5
+    - g++-6
+    - gcc-6
     - build-essential
     - checkinstall
+
+cache:
+  directories:
+    - ${TRAVIS_BUILD_DIR}/deps/llvm-3.6.2
+    - ${TRAVIS_BUILD_DIR}/deps/llvm-3.7.1
+    - ${TRAVIS_BUILD_DIR}/deps/llvm-3.8.0
+
+matrix:
+  include:
+    - os: linux
+      env: UNIT_TESTS=true LLVM_VERSION=3.6.2
+      compiler: clang
+    - os: linux
+      env: UNIT_TESTS=true LLVM_VERSION=3.7.1
+      compiler: clang
 
 before_install:
 #  - $CXX --version
