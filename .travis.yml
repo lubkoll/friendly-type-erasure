@@ -21,10 +21,11 @@ cache:
 matrix:
   include:
     - os: linux
-      env: UNIT_TESTS=true CXX=g++-5
+      env: UNIT_TESTS=true COMPILER=g++-5
       compiler: gcc
 
 install:
+  - if [[ "${COMPILER}" != "" ]]; then export CXX=${COMPILER}; fi
   - $CXX --version
 #  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 #  - sudo apt-get update -qq
