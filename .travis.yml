@@ -21,11 +21,8 @@ cache:
 matrix:
   include:
     - os: linux
-      env: UNIT_TESTS=true LLVM_VERSION=3.6.2
-      compiler: clang
-    - os: linux
-      env: UNIT_TESTS=true LLVM_VERSION=3.7.1
-      compiler: clang
+      env: UNIT_TESTS=true COMPILER=g++-5
+      compiler: gcc
 
 before_install:
 #  - $CXX --version
