@@ -7,7 +7,6 @@ addons:
     packages:
     - g++-5
     - gcc-5
-    - gcov-5
     - build-essential
     - checkinstall
 
