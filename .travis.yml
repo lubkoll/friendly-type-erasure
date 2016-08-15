@@ -24,7 +24,7 @@ matrix:
       env: UNIT_TESTS=true CXX=g++-5
       compiler: gcc
 
-before_install:
+install:
   - $CXX --version
 #  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 #  - sudo apt-get update -qq
