@@ -39,9 +39,15 @@ matrix:
     - os: linux
       env: COMPILER=g++-6
       compiler: gcc
+    
+    # Clang 3.6
+    - os: linux
+      env: LLVM_VERSION=3.6.2
+      compiler: clang
 
 install:
   - if [[ "${COMPILER}" != "" ]]; then export CXX=${COMPILER}; fi
+  - if [[ "${LLVM_VERSION}" == "default" ]]; then LLVM_VERSION=3.8.0; fi
   - $CXX --version
 #  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 #  - sudo apt-get update -qq
