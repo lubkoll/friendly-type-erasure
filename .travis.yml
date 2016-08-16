@@ -11,7 +11,7 @@ addons:
     - gcc-6
     - build-essential
     - checkinstall
-    - ibreadline-gplv2-dev 
+    - libreadline-gplv2-dev 
     - libncursesw5-dev 
     - libssl-dev 
     - libsqlite3-dev 
@@ -29,6 +29,7 @@ cache:
 
 matrix:
   include:
+    # LINUX
     # GCC 5
     - os: linux
       env: UNIT_TESTS=true COMPILER=g++-5
