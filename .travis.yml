@@ -59,7 +59,7 @@ matrix:
       
     # Clang 3.6
     - os: linux
-      env: COMPILER=clang++-3.8 CCOMPILER=clang-3.8 LLVM_VERSION=3.8.0
+      env: LLVM_VERSION=3.8.0
       compiler: clang
       
 install:
@@ -73,7 +73,6 @@ install:
   # Setup default versions and override compiler if needed
   ############################################################################
   - if [[ "${COMPILER}" != "" ]]; then export CXX=${COMPILER}; fi
-  - if [[ "${CCOMPILER}" != "" ]]; then export CC=${CCOMPILER}; fi
   - if [[ "${LLVM_VERSION}" == "default" ]]; then LLVM_VERSION=3.8.0; fi
   
   ############################################################################
@@ -105,11 +104,12 @@ install:
         travis_retry wget --quiet -O - ${LIBCXXABI_URL} | tar --strip-components=1 -xJ -C ${LLVM_DIR}/projects/libcxxabi
         travis_retry wget --quiet -O - ${CLANG_URL}     | tar --strip-components=1 -xJ -C ${LLVM_DIR}/clang
         (cd ${LLVM_DIR}/build && cmake .. -DCMAKE_INSTALL_PREFIX=${LLVM_DIR}/install -DCMAKE_CXX_COMPILER=clang++)
-        (cd ${LLVM_DIR}/build/projects/libcxx && make install -j2)
-        (cd ${LLVM_DIR}/build/projects/libcxxabi && make install -j2)
+#        (cd ${LLVM_DIR}/build/projects/libcxx && make install -j2)
+#        (cd ${LLVM_DIR}/build/projects/libcxxabi && make install -j2)
       fi
-      export CXXFLAGS="-nostdinc++ -isystem ${LLVM_DIR}/install/include/c++/v1"
+#      export CXXFLAGS="-nostdinc++ -isystem ${LLVM_DIR}/install/include/c++/v1"
       export LDFLAGS="-L ${LLVM_DIR}/install/lib -l c++ -l c++abi"
+#      export LDFLAGS="-L ${LLVM_DIR}/install/lib -l c++ -l c++abi"
       export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${LLVM_DIR}/install/lib"
       export PATH="${LLVM_DIR}/clang/bin:${PATH}"
     fi    
