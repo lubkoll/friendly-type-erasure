@@ -13,8 +13,11 @@ addons:
     - g++-6
     - gcc-6
     - clang-3.6
+    - libclang-3.6-dev
     - clang-3.7
+    - libclang-3.7-dev
     - clang-3.8
+    - libclang-3.8-dev
     - libgtest-dev
     - build-essential
     - checkinstall
