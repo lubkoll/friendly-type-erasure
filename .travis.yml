@@ -35,6 +35,11 @@ matrix:
       env: COMPILER=g++-5
       compiler: gcc
 
+    # GCC 6
+    - os: linux
+      env: COMPILER=g++-6
+      compiler: gcc
+
 install:
   - if [[ "${COMPILER}" != "" ]]; then export CXX=${COMPILER}; fi
   - $CXX --version
