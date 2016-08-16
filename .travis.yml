@@ -9,6 +9,10 @@ addons:
     - gcc-5
     - g++-6
     - gcc-6
+    - clang-3.6
+    - clang-3.7
+    - clang-3.8
+    - libgtest-dev
     - build-essential
     - checkinstall
     - libreadline-gplv2-dev 
@@ -46,12 +50,7 @@ matrix:
     - os: linux
       env: COMPILER=g++-6
       compiler: gcc
-    
-    # Clang 3.6
-    - os: linux
-      env: LLVM_VERSION=3.6.2
-      compiler: clang
-
+      
 install:
   ############################################################################
   # All the dependencies are installed in ${TRAVIS_BUILD_DIR}/deps/
@@ -120,17 +119,17 @@ install:
   # - sudo make -C lcov-1.11/ install
   # install lcov to coveralls conversion + upload tool
   # - gem install coveralls-lcov
-  - sudo apt-get install libclang-3.8-dev -qq
+#  - sudo apt-get install libclang-3.8-dev -qq
  # - sudo apt-get install build-essential checkinstall -qq
 #  - sudo apt-get install libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev -qq
  # - sudo apt-get install python-pip -qq
   - sudo pip install clang
-  - sudo apt-get install libgtest-dev -qq
-  - cd /usr/src/gtest
-  - sudo cmake CMakeLists.txt
-  - sudo make 
+#  - sudo apt-get install libgtest-dev -qq
+#  - cd /usr/src/gtest
+#  - sudo cmake CMakeLists.txt
+#  - sudo make 
   # copy or symlink libgtest.a and libgtest_main.a to your /usr/lib folder
-  - sudo cp *.a /usr/lib
+ # - sudo cp *.a /usr/lib
   - cd $TRAVIS_BUILD_DIR
 script:
   - cd tests
