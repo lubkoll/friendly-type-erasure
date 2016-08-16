@@ -59,7 +59,7 @@ matrix:
       
     # Clang 3.6
     - os: linux
-      env: COMPILER=clang++-3.6
+      env: COMPILER=clang++-3.6 LLVM_VERSION=3.6.2
       compiler: clang
       
 install:
