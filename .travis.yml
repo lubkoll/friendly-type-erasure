@@ -59,7 +59,7 @@ matrix:
       
     # Clang 3.6
     - os: linux
-      env: COMPILER=clang++-3.6 LLVM_VERSION=3.6.2
+      env: COMPILER=clang++-3.6 CCOMPILER=clang-3.6 LLVM_VERSION=3.6.2
       compiler: clang
       
 install:
@@ -73,6 +73,7 @@ install:
   # Setup default versions and override compiler if needed
   ############################################################################
   - if [[ "${COMPILER}" != "" ]]; then export CXX=${COMPILER}; fi
+  - if [[ "${CCOMPILER}" != "" ]]; then export CC=${CCOMPILER}; fi
   - if [[ "${LLVM_VERSION}" == "default" ]]; then LLVM_VERSION=3.8.0; fi
   
   ############################################################################
@@ -103,7 +104,7 @@ install:
         travis_retry wget --quiet -O - ${LIBCXX_URL}    | tar --strip-components=1 -xJ -C ${LLVM_DIR}/projects/libcxx
         travis_retry wget --quiet -O - ${LIBCXXABI_URL} | tar --strip-components=1 -xJ -C ${LLVM_DIR}/projects/libcxxabi
         travis_retry wget --quiet -O - ${CLANG_URL}     | tar --strip-components=1 -xJ -C ${LLVM_DIR}/clang
-        (cd ${LLVM_DIR}/build && cmake .. -DCMAKE_INSTALL_PREFIX=${LLVM_DIR}/install -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang)
+        (cd ${LLVM_DIR}/build && cmake .. -DCMAKE_INSTALL_PREFIX=${LLVM_DIR}/install -DCMAKE_CXX_COMPILER=clang++)
         (cd ${LLVM_DIR}/build/projects/libcxx && make install -j2)
         (cd ${LLVM_DIR}/build/projects/libcxxabi && make install -j2)
       fi
