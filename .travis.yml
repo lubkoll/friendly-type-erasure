@@ -11,6 +11,15 @@ addons:
     - gcc-6
     - build-essential
     - checkinstall
+    - ibreadline-gplv2-dev 
+    - libncursesw5-dev 
+    - libssl-dev 
+    - libsqlite3-dev 
+    - tk-dev 
+    - libgdbm-dev 
+    - libc6-dev 
+    - libbz2-dev
+    - python-pip
 
 cache:
   directories:
@@ -20,8 +29,13 @@ cache:
 
 matrix:
   include:
+    # GCC 5
     - os: linux
       env: UNIT_TESTS=true COMPILER=g++-5
+      compiler: gcc
+    # GCC 6
+    - os: linux
+      env: UNIT_TESTS=true COMPILER=g++-6
       compiler: gcc
 
 install:
@@ -45,8 +59,8 @@ install:
   # - gem install coveralls-lcov
   - sudo apt-get install libclang-3.8-dev -qq
  # - sudo apt-get install build-essential checkinstall -qq
-  - sudo apt-get install libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev -qq
-  - sudo apt-get install python-pip -qq
+#  - sudo apt-get install libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev -qq
+ # - sudo apt-get install python-pip -qq
   - sudo pip install clang
   - sudo apt-get install libgtest-dev -qq
   - cd /usr/src/gtest
