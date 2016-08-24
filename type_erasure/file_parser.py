@@ -57,15 +57,30 @@ class GenericFileParser(object):
             if self.opened[-1] == 'class':
                 self.parse_closing_class(parent)
 
-        if clang_util.is_static_or_global_variable(cursor.kind):
+#        print '\nCursor'
+#         print cursor.kind
+#         print cursor.spelling
+#         print self.data.current_struct.spelling
+#         tokens = clang_util.get_tokens(self.data.tu, cursor)
+#         for token in tokens:
+#             print token.spelling
+
+        if clang_util.is_inclusion_directive(cursor.kind):
+            self.processor.process_inclusion_directive(self.data,cursor)
+        elif clang_util.is_access_specifier(cursor.kind):
+            self.processor.process_access_specifier(self.data,cursor)
+        elif clang_util.is_constructor(cursor.kind):
+            self.processor.process_constructor(self.data,cursor)
+        elif clang_util.is_destructor(cursor.kind):
+            self.processor.process_destructor(self.data,cursor)
+        elif clang_util.is_static_or_global_variable(cursor.kind):
             self.processor.process_variable_declaration(self.data,cursor)
-            return Continue
+        elif clang_util.is_member_variable(cursor.kind):
+            self.processor.process_member_variable_declaration(self.data,cursor)
         elif clang_util.is_enum(cursor.kind):
             self.processor.process_enum(self.data,cursor)
-            return Continue
         elif clang_util.is_forward_declaration(self.data.tu, cursor):
             self.processor.process_forward_declaration(self.data,cursor)
-            return Continue
         elif clang_util.is_namespace(cursor.kind):
             self.opened.append('namespace')
             return self.parse_opening_namespace(cursor)
@@ -76,7 +91,6 @@ class GenericFileParser(object):
             return self.parse_function(cursor)
         elif clang_util.is_type_alias(kind) or clang_util.is_typedef(kind):
             self.processor.process_type_alias(self.data,cursor)
-            return Continue
 
         return Continue
 
@@ -130,6 +144,9 @@ class FileProcessor(object):
     def __init__(self):
         pass
 
+    def process_inclusion_directive(self, data, cursor):
+        pass
+
     def process_open_include_guard(self, filename):
         pass
 
@@ -160,6 +177,15 @@ class FileProcessor(object):
     def process_variable_declaration(self, data, cursor):
         pass
 
+    def process_member_variable_declaration(self, data, cursor):
+        pass
+
+    def process_constructor(self, data, cursor):
+        pass
+
+    def process_destructor(self, data, cursor):
+        pass
+
     def process_type_alias(self, data, cursor):
         pass
 
@@ -167,7 +193,4 @@ class FileProcessor(object):
         pass
 
     def process_access_specifier(self, data, cursor):
-        pass
-
-    def write_to_file(self):
         pass

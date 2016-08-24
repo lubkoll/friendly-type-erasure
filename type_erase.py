@@ -79,7 +79,5 @@ if __name__ == "__main__":
                                                )
     args.interface_form, args.handle_form = get_forms(args)
 
-    indentation = ' ' * args.indent
-
-    impl_namespace_name = type_erasure.handle_generator.write_file(args,indentation)
-    type_erasure.interface_generator.write_file(args,indentation)
+    type_erasure.handle_generator.write_file(args)
+    type_erasure.interface_generator.write_file(args)

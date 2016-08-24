@@ -57,6 +57,7 @@ class CppFileWriter(FileProcessor):
         self.class_indent = self.open_classes * base_indent
         self.include_guard = None
         self.current_struct_prefix = None
+        self.access_specifier = 'private'
 
     def process_open_include_guard(self, filename):
         self.include_guard = extract_include_guard(filename)
@@ -64,9 +65,9 @@ class CppFileWriter(FileProcessor):
             return None
         if self.comments is not None:
             if util.trim(self.include_guard) == '#pragma once':
-                copyright_ = util.get_comment('', self.comments, self.include_guard)
+                copyright_ = util.get_comment(self.comments, self.include_guard)
             else:
-                copyright_ = util.get_comment('', self.comments, self.include_guard[0])
+                copyright_ = util.get_comment(self.comments, self.include_guard[0])
             if copyright_ != '':
                 self.file_content.append(copyright_ + '\n')
         self.file_content.append(self.include_guard)
@@ -86,7 +87,7 @@ class CppFileWriter(FileProcessor):
 
     def process_open_namespace(self, namespace_name):
         namespace_prefix = 'namespace ' + namespace_name
-        comment = util.get_comment('', self.comments, namespace_prefix)
+        comment = util.get_comment(self.comments, namespace_prefix)
         self.file_content.append(comment)
         self.file_content.append(self.namespace_indent + namespace_prefix + '\n')
         self.file_content.append(self.namespace_indent + '{' + '\n')
@@ -110,26 +111,36 @@ class CppFileWriter(FileProcessor):
 
     def process_type_alias(self,data,cursor):
         type_alias = clang_util.get_type_alias_or_typedef(data.tu, cursor)
-        self.append_comment(self.namespace_indent, type_alias)
+        self.append_comment(type_alias)
         self.file_content.append(self.namespace_indent + self.class_indent + type_alias + '\n')
 
     def process_variable_declaration(self,data,cursor):
         variable_declaration = clang_util.get_variable_declaration(data.tu, cursor)
-        self.append_comment(self.namespace_indent, variable_declaration)
+        self.append_comment(variable_declaration)
         self.file_content.append(self.namespace_indent + self.class_indent + variable_declaration + '\n')
 
     def process_forward_declaration(self,data,cursor):
         class_prefix = clang_util.get_class_prefix(data.tu,cursor)
-        self.append_comment(self.namespace_indent, class_prefix)
-        self.file_content.append(self.namespace_indent + self.class_indent + class_prefix + '\n\n')
+        self.append_comment(class_prefix)
+        self.file_content.append(self.namespace_indent + self.class_indent + class_prefix + ';\n\n')
 
     def process_enum(self,data,cursor):
         enum_definition = clang_util.get_enum_definition(data.tu, cursor)
-        self.append_comment(self.namespace_indent, enum_definition.replace('\n', ''))
+        self.append_comment(enum_definition.replace('\n', ''))
         self.file_content.append(clang_util.format_enum_definition(self.namespace_indent + self.class_indent, self.base_indent, enum_definition)+'\n')
 
-    def append_comment(self,indent,signature):
-        self.file_content.append(get_comment(indent, self.comments, signature))
+    def process_access_specifier(self, data, cursor):
+        tokens = clang_util.get_tokens(data.tu, cursor)
+        self.access_specifier = tokens[0].spelling
+
+        indent_length = len(self.namespace_indent) + len(self.class_indent) - len(self.base_indent)
+        if indent_length < 0:
+            indent_length = 0
+        indent = ' ' * indent_length
+        self.file_content.append(indent + self.access_specifier + ':\n')
+
+    def append_comment(self,signature):
+        self.file_content.append(util.get_comment(self.comments, signature))
 
     def write_to_file(self):
         file_ = open(self.filename, 'w')
@@ -154,7 +165,7 @@ class FormFileWriter(CppFileWriter):
         if self.expansion_lines[1][0] == -1:
             return
         alias_or_typedef = clang_util.get_type_alias_or_typedef(data.tu, cursor)
-        comment = util.get_comment(self.base_indent, self.comments, alias_or_typedef)
+        comment = util.get_comment(self.comments, alias_or_typedef)
         if '{type_aliases}' in self.lines[self.expansion_lines[1][0]]:
             self.lines[self.expansion_lines[1][0]] = comment
         else:
@@ -168,7 +179,7 @@ class FormFileWriter(CppFileWriter):
         if self.expansion_lines[1][0] == -1:
             return
         variable_declaration = clang_util.get_variable_declaration(data.tu, cursor)
-        comment = util.get_comment(self.base_indent, self.comments, variable_declaration)
+        comment = util.get_comment(self.comments, variable_declaration)
         if '{type_aliases}' in self.lines[self.expansion_lines[1][0]]:
             self.lines[self.expansion_lines[1][0]] = comment
         else:
@@ -184,7 +195,7 @@ class FormFileWriter(CppFileWriter):
             return
         # process nested enum
         enum_definition = clang_util.get_enum_definition(data.tu, cursor)
-        comment = util.get_comment(self.base_indent, self.comments, enum_definition)
+        comment = util.get_comment(self.comments, enum_definition)
         if '{type_aliases}' in self.lines[self.expansion_lines[1][0]]:
             self.lines[self.expansion_lines[1][0]] = comment
         else:
@@ -249,7 +260,7 @@ class DistributedFileWriter(FileProcessor):
 
     def process_headers(self, headers):
         self.header_filewriter.process_headers(headers)
-        self.source_filewriter.process_headers(['#include "' + self.header_filewriter.filename + '"'])
+        self.source_filewriter.process_headers(['"' + self.header_filewriter.filename + '"'])
 
     def process_open_namespace(self, namespace_name):
         self.header_filewriter.process_open_namespace(namespace_name)
@@ -286,3 +297,109 @@ class DistributedFileWriter(FileProcessor):
     def write_to_file(self):
         self.header_filewriter.write_to_file()
         self.source_filewriter.write_to_file()
+
+
+class FullyDistributedFileWriter(FileProcessor):
+    def __init__(self, header_filewriter, source_filewriter):
+        self.header_filewriter = header_filewriter
+        self.source_filewriter = source_filewriter
+
+    def process_open_include_guard(self, filename):
+        self.header_filewriter.process_open_include_guard(filename)
+        self.source_filewriter.process_open_include_guard(filename)
+
+    def process_close_include_guard(self):
+        self.header_filewriter.process_close_include_guard()
+        self.source_filewriter.process_close_include_guard()
+
+    def process_headers(self, headers):
+        self.header_filewriter.process_headers(headers)
+        self.source_filewriter.process_headers(['"' + self.header_filewriter.filename + '"'])
+
+    def process_open_namespace(self, namespace_name):
+        self.header_filewriter.process_open_namespace(namespace_name)
+        self.source_filewriter.process_open_namespace(namespace_name)
+
+    def process_close_namespace(self):
+        self.header_filewriter.process_close_namespace()
+        self.source_filewriter.process_close_namespace()
+
+    def process_open_class(self, data):
+        self.header_filewriter.process_open_class(data)
+        self.source_filewriter.process_open_class(data)
+
+    def process_close_class(self):
+        self.header_filewriter.process_close_class()
+        self.source_filewriter.process_close_class()
+
+    def process_function(self, data, cursor):
+        self.header_filewriter.process_function(data, cursor)
+        self.source_filewriter.process_function(data, cursor)
+
+    def process_type_alias(self, data, cursor):
+        self.header_filewriter.process_type_alias(data, cursor)
+        self.source_filewriter.process_type_alias(data, cursor)
+
+    def process_variable_declaration(self,data,cursor):
+        self.header_filewriter.process_variable_declaration(data,cursor)
+        self.source_filewriter.process_variable_declaration(data,cursor)
+
+    def process_forward_declaration(self,data,cursor):
+        self.header_filewriter.process_forward_declaration(data,cursor)
+        self.source_filewriter.process_forward_declaration(data,cursor)
+
+    def process_enum(self,data,cursor):
+        self.header_filewriter.process_enum(data,cursor)
+        self.source_filewriter.process_enum(data,cursor)
+
+    def process_access_specifier(self,data,cursor):
+        self.header_filewriter.process_access_specifier(data,cursor)
+        self.source_filewriter.process_access_specifier(data,cursor)
+
+    def process_constructor(self,data,cursor):
+        self.header_filewriter.process_constructor(data,cursor)
+        self.source_filewriter.process_constructor(data,cursor)
+
+    def write_to_file(self):
+        self.header_filewriter.write_to_file()
+        self.source_filewriter.write_to_file()
+
+
+class SpecialMemberFunctionDetector(FileProcessor):
+    def __init__(self):
+        self.has_declared_constructors = False
+        self.has_declared_default_constructor = False
+        self.has_declared_copy_constructor = False
+        self.has_declared_move_constructor = False
+        self.has_declared_copy_assignment = False
+        self.has_declared_move_assignment = False
+        self.has_declared_destructor = False
+        self.has_implicit_default_constructor = True
+        self.has_implicit_copy_constructor = True
+        self.has_implicit_copy_assignment = True
+        self.has_implicit_move_operations = True
+        self.has_implicit_destructor = True
+
+    def process_constructor(self,data,cursor):
+        self.has_declared_constructors = True
+        self.has_implicit_default_constructor = False
+
+        tokens = clang_util.get_tokens(data.tu, cursor)
+        for i in range(len(tokens)):
+            if tokens[i].spelling == cursor.spelling and tokens[i+1] == '(':
+                if tokens[i+2] == ')':
+                    self.has_declared_default_constructor = True
+                elif tokens[i+3] == cursor.spelling and tokens[i+4] =='&&':
+                    self.has_declared_move_constructor = True
+                    self.has_implicit_move_operations = False
+                    self.has_implicit_copy_constructor = False
+                    self.has_implicit_copy_assignment = False
+                elif (tokens[i+3] == 'const' and tokens[i+4] == cursor.spelling and tokens[i+5] == '&') or \
+                        (tokens[i+3] == cursor.spelling and tokens[i+4] == 'const' and tokens[i+5] == '&'):
+                    self.has_declared_copy_constructor = True
+                    self.has_implicit_move_operations = False
+                    self.has_implicit_copy_constructor = False
+
+    def process_destructor(self,data,cursor):
+        self.has_declared_destructor = True
+        self.has_implicit_move_operations = False

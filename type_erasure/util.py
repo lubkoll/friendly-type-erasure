@@ -2,7 +2,7 @@ import argparse
 import clang
 import os
 import re
-
+from subprocess import call
 from parser_addition import extract_include_guard, trim
 
 
@@ -60,12 +60,14 @@ def print_diagnostic(diag):
 
 
 def unify_signature(function):
+    function = re.sub('\s*~\s*', '~',function)
+    function = re.sub('\s*=\s*', '=',function)
     function = re.sub('\s*\&\s*', '& ',function)
     function = re.sub('\s*\<\s*', '\<',function)
     function = re.sub('\s*\>\s*', '\>',function)
     function = re.sub('\s*\*\s*', '* ',function)
     function = re.sub('\s*\(\s*', '(',function)
-    function = re.sub('\s*]\)\s*', ') ',function)
+    function = re.sub('\s*\)\s*', ') ',function)
     function = re.sub('\s*\{\s*', '(',function)
     function = re.sub('\s*\}\s*', ') ',function)
     function = re.sub('class\s+','',function)
@@ -86,20 +88,48 @@ def close_namespaces(file_writer, data):
         file_writer.process_close_namespace()
 
 
+def concat(tokens,spacing=''):
+    str = ''
+    for token in tokens:
+        str += token.spelling + spacing
+    return str
+
+
+def clang_format(filename):
+    call(["clang-format-3.8", '-i', filename])
+
+
 def indent_lines(lines, data, indent):
     regex = re.compile(r'\n')
     return regex.sub('\n' + indent, indent + lines)
 
 
-def get_comment(findent, comments, name):
+def same_class(entry, classname):
+    return entry.type == 'class' and entry.name == classname
+
+
+def is_class(entry):
+    return entry.type == 'class' or entry.type == 'struct'
+
+
+def is_namespace(entry):
+    return entry.type == 'namespace'
+
+
+def is_function(entry):
+    return entry.type == 'function'
+
+
+def get_comment(comments, name):
     if comments is not None:
         for comment in comments:
+            print "comparing " + name + " and " + comment.name
             if same_signature(name,comment.name):
                 out = ''
                 for line in comment.comment:
                     if line.startswith('*'):
                         out += ' '
-                    out += findent + line
+                    out += line
                 return out
     return ''
 
