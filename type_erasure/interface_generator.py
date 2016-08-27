@@ -2,31 +2,15 @@
 
 import argparse
 import code
-import os
-import re
-import sys
-from clang.cindex import Config
-from clang.cindex import CursorKind
-from clang.cindex import TypeKind
-from clang.cindex import TranslationUnit
-from parser_addition import trim
-from parser_addition import extract_comments
-from parser_addition import extract_includes
-from inheritance_based_file_writer import HeaderOnlyInterfaceFileWriter
-from inheritance_based_file_writer import InterfaceFileWriter
-from file_writer import get_source_filename
-from vtable_based_file_writer import HeaderOnlyVTableInterfaceFileWriter
-from vtable_based_file_writer import VTableInterfaceFileWriter
-import file_parser
 import cpp_file_parser
+import file_parser
+import parser_addition
 import to_string
 import util
 
 
 def add_arguments(parser):
     parser.add_argument('--interface-file', type=str, required=False, help='write output to given file')
-    parser.add_argument('-cow', '--copy-on-write', nargs='?', type=str, required=False,
-                        const=True, default=False)
     parser.add_argument('--headers', type=str, required=False,
                         help='file containing headers to prepend to the generated code')
     parser.add_argument('--header-only', action='store_true',
@@ -34,9 +18,6 @@ def add_arguments(parser):
     parser.add_argument('--buffer', nargs='?', type=str, required=False,
                         default='128',
                         help='buffer size or c++-macro specifying the buffer size')
-    parser.add_argument('-sbo', '--small-buffer-optimization', nargs='?', type=bool, required=False,
-                        const=True, default=False,
-                        help='enables small buffer optimization')
 
 
 def create_parser():
@@ -48,15 +29,8 @@ def create_parser():
 
 def parse_additional_args(args, data):
     data.interface_file = args.interface_file
-    data.interface_form_lines = util.prepare_form(open(args.interface_form).readlines())
-    data.headers = args.headers and open(args.headers).read() or ''
-    data.copy_on_write = args.copy_on_write
     data.header_only = args.header_only
     data.buffer = args.buffer
-    data.small_buffer_optimization = args.small_buffer_optimization
-    if not data.header_only:
-        data.interface_cpp_form_lines = util.prepare_form(open(args.interface_form.replace('.hpp','.cpp')).readlines())
-
     return data
 
 
@@ -68,92 +42,148 @@ def parse_args(args):
     return data
 
 
-def get_filewriter(data, indentation, comments):
-    if data.vtable:
-        if data.header_only:
-            return HeaderOnlyVTableInterfaceFileWriter(data.interface_file, indentation, comments)
-        return VTableInterfaceFileWriter(data.interface_file, get_source_filename(data.interface_file), indentation, comments)
+def add_default_interface(data, scope, classname, detail_namespace):
+    # constructors
+    if data.small_buffer_optimization:
+        buffer = 'using Buffer = std :: array < char , ' + data.buffer + ' > ;'
+        scope.add(cpp_file_parser.get_alias_from_text('Buffer', buffer))
+        handle_base = 'using HandleBase = ' + detail_namespace + ' :: HandleBase < Buffer > ;'
+        scope.add(cpp_file_parser.get_alias_from_text('HandleBase', handle_base))
+        stack_allocated_handle = 'template < class T > using StackAllocatedHandle = ' + \
+                                 detail_namespace + ' :: Handle < T , Buffer , false > ;'
+        scope.add(cpp_file_parser.get_alias_from_text('StackAllocatedHandle', stack_allocated_handle))
+        heap_allocated_handle = 'template < class T > using HeapAllocatedHandle = ' + \
+                                 detail_namespace + ' :: Handle < T , Buffer , true > ;'
+        scope.add(cpp_file_parser.get_alias_from_text('HeapAllocatedHandle', heap_allocated_handle))
+        scope.add(cpp_file_parser.Separator())
+
+    scope.add( cpp_file_parser.AccessSpecifier(cpp_file_parser.PUBLIC) )
+    constexpr = '' if data.small_buffer_optimization else 'constexpr'
+    scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
+                                                      code.get_default_default_constructor(classname,'noexcept',constexpr),
+                                                      'constructor') )
+    scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
+                                                     code.get_handle_constructor(data, classname, detail_namespace),
+                                                     cpp_file_parser.CONSTRUCTOR_TEMPLATE))
+    if not data.copy_on_write:
+        scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
+                                                         code.get_handle_copy_constructor(data, classname),
+                                                         'constructor'))
+        scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
+                                                          code.get_handle_move_constructor(data, classname),
+                                                          'constructor') )
+        if data.small_buffer_optimization:
+            destructor = '~ ' + classname + ' ( ) { reset ( ) ; }'
+            scope.add( cpp_file_parser.get_function_from_text(classname, '~'+classname, '',
+                                                             destructor, 'destructor'))
+        scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
+                                                         code.get_handle_copy_operator(data, classname)))
+        scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
+                                                         code.get_handle_move_operator(data, classname)))
+
+    # assignment operators
+    scope.add( cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
+                                                      code.get_handle_assignment(data, classname, detail_namespace),
+                                                      cpp_file_parser.FUNCTION_TEMPLATE) )
+
+    # operator bool
+    function = cpp_file_parser.get_function_from_text(classname, 'operator bool', 'return ',
+                                                      code.get_operator_bool_for_member_ptr('handle_') )
+    comment = code.get_operator_bool_comment(function.get_declaration())
+    scope.add( cpp_file_parser.Comment(comment) )
+    scope.add( function )
+
+    # casts
+    function = cpp_file_parser.get_function_from_text(classname, 'target', 'return ',
+                                                      code.get_handle_cast(data, 'handle_', detail_namespace),
+                                                      cpp_file_parser.FUNCTION_TEMPLATE)
+    comment = code.get_handle_cast_comment(function.get_declaration())
+    scope.add( cpp_file_parser.Comment(comment) )
+    scope.add( function )
+
+    function = cpp_file_parser.get_function_from_text(classname, 'target', 'return ',
+                                                      code.get_handle_cast(data, 'handle_', detail_namespace, 'const'),
+                                                      cpp_file_parser.FUNCTION_TEMPLATE)
+    comment = code.get_handle_cast_comment(function.get_declaration(), 'const')
+    scope.add( cpp_file_parser.Comment(comment) )
+    scope.add( function )
+
+
+def add_private_section(data, scope, detail_namespace, classname):
+    scope.add(cpp_file_parser.AccessSpecifier(cpp_file_parser.PRIVATE))
+    if data.small_buffer_optimization:
+        reset = 'void reset ( ) noexcept { if ( handle_ ) handle_ -> destroy ( ) ; }'
+        scope.add(cpp_file_parser.get_function_from_text(classname, 'reset', '', reset))
+
+    if data.copy_on_write:
+        handle_base = 'HandleBase'
+        if not data.small_buffer_optimization:
+            handle_base = detail_namespace + ' :: ' + handle_base
+        scope.add(cpp_file_parser.AccessSpecifier('private'))
+        scope.add(cpp_file_parser.get_function_from_text(classname, 'read', 'return ',
+                                                         code.get_handle_read_function(handle_base)))
+        scope.add(cpp_file_parser.get_function_from_text(classname, 'write', 'return ',
+                                                         code.get_handle_write_function(data, handle_base)))
+
+    if data.copy_on_write and data.small_buffer_optimization:
+        scope.add(cpp_file_parser.Variable('std::shared_ptr< HandleBase > handle_;'))
+    elif not data.copy_on_write and data.small_buffer_optimization:
+        scope.add(cpp_file_parser.Variable('HandleBase * handle_ = nullptr ;'))
+    elif data.copy_on_write and not data.small_buffer_optimization:
+        scope.add(cpp_file_parser.Variable('std::shared_ptr< ' + detail_namespace + '::HandleBase > handle_;'))
     else:
-        if data.header_only:
-            return HeaderOnlyInterfaceFileWriter(data.interface_file, indentation, comments)
-        return InterfaceFileWriter(data.interface_file, get_source_filename(data.interface_file), indentation, comments)
+        scope.add(cpp_file_parser.Variable('std::unique_ptr< ' + detail_namespace + '::HandleBase > handle_;'))
+
+    if data.small_buffer_optimization:
+        scope.add(cpp_file_parser.Variable('Buffer buffer_ ;'))
 
 
-def add_default_interface(scope, classname, detail_namespace):
-    scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                      code.get_default_default_constructor(classname,'noexcept','constexpr'),
-                                                      'constructor') )
-    scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                     code.get_handle_constructor(classname, detail_namespace),
-                                                     'constructor'))
-    scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                     code.get_handle_copy_constructor(classname),
-                                                     'constructor'))
-    scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                      code.get_handle_move_constructor(classname),
-                                                      'constructor') )
-    scope.add( cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
-                                                      code.get_handle_assignment(classname, detail_namespace) ) )
-    scope.add( cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
-                                                      code.get_handle_copy_operator(classname) ) )
-    scope.add( cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
-                                                      code.get_handle_move_operator(classname) ) )
-    scope.add( cpp_file_parser.get_function_from_text(classname, 'operator bool', 'return ',
-                                                      code.get_operator_bool_for_member_ptr('handle_') ) )
-    scope.add( cpp_file_parser.get_function_from_text(classname, 'target', 'return ',
-                                                      code.get_handle_cast('handle_', detail_namespace) ) )
-    scope.add( cpp_file_parser.get_function_from_text(classname, 'target', 'return ',
-                                                      code.get_handle_cast('handle_', detail_namespace, 'const') ) )
+class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
+    def __init__(self, scope, copy_on_write):
+        self.scope = scope
+        self.in_private_section = True
+        self.copy_on_write = copy_on_write
+
+    def visit_access_specifier(self, access_specifier):
+        self.in_private_section = access_specifier.value == cpp_file_parser.PRIVATE
+        if not self.in_private_section:
+            self.scope.add(access_specifier)
+
+    def visit(self,entry):
+        if self.in_private_section:
+            return
+        self.scope.add(entry)
+
+    def visit_function(self,function):
+        if self.in_private_section:
+            return
+
+        code = util.concat(function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)],
+                           ' ')
+        code += ' { assert ( handle_ ) ; ' + function.return_str
+        if self.copy_on_write:
+            if cpp_file_parser.is_const(function):
+                code += 'read ( ) . '
+            else:
+                code += 'write ( ) . '
+        else:
+            code += 'handle_ -> '
+        code += function.name + ' ( ' + cpp_file_parser.get_function_arguments_in_single_call(function) + ' ) ; }'
+
+        self.scope.add(cpp_file_parser.get_function_from_text(function.classname, function.name, function.return_str, code))
 
 
-def add_pimpl(scope, detail_namespace):
-    scope.add(cpp_file_parser.AccessSpecifier('private'))
-    scope.add(cpp_file_parser.Variable('std::unique_ptr< ' + detail_namespace + '::HandleBase > handle_;'))
-
-def add_interface(scope, class_scope, detail_namespace):
+def add_interface(data, scope, class_scope, detail_namespace):
     if util.is_class(class_scope):
         scope.add(cpp_file_parser.Class(class_scope.get_name()))
-        scope.add(cpp_file_parser.AccessSpecifier('public'))
     else:
         scope.add(cpp_file_parser.Struct(class_scope.get_name()))
 
-    add_default_interface(scope, class_scope.get_name(), detail_namespace)
+    add_default_interface(data, scope, class_scope.get_name(), detail_namespace)
 
+    class_scope.visit(HandleFunctionExtractor(scope, data.copy_on_write))
 
-    is_private = util.is_class(class_scope)
-    for entry in class_scope.content:
-        if cpp_file_parser.is_access_specifier(entry):
-            is_private = entry.value == cpp_file_parser.PRIVATE
-        elif not is_private:
-            if cpp_file_parser.is_function(entry):
-                scope.add(cpp_file_parser.get_function_from_text(class_scope.get_name(), entry.name, entry.return_str,
-                                                                 code.get_handle_interface_function(entry)))
-            else:
-                scope.add(entry)
-
-
-
-
-#    destructor = 'virtual ~ ' + classname + ' ( ) = default ;'
-#    add_function(scope, classname, '~'+classname, '', destructor, 'destructor')
-#    clone = 'virtual ' + classname + ' * clone ( ) const = 0 ;'
-#    add_function(scope, classname, 'clone', 'return ', clone)
-
-    # for entry in class_scope.content:
-    #     if util.is_function(entry):
-    #         tokens = copy.deepcopy(entry.tokens[:cpp_file_parser.get_declaration_end_index(entry.name,entry.tokens)])
-    #
-    #         if tokens[0].spelling != 'virtual':
-    #             tokens.insert(0,cpp_file_parser.SimpleToken('virtual'))
-    #
-    #         if tokens[-1].spelling != '0' or tokens[-2].spelling != '=':
-    #             tokens.extend([cpp_file_parser.SimpleToken('='),
-    #                            cpp_file_parser.SimpleToken('0')])
-    #         tokens.append(cpp_file_parser.SimpleToken(';'))
-    #
-    #         scope.add( cpp_file_parser.Function(entry.classname, entry.name, entry.return_str, tokens) )
-
-    add_pimpl(scope, detail_namespace)
+    add_private_section(data, scope, detail_namespace, class_scope.get_name())
     scope.close()
 
 
@@ -164,16 +194,26 @@ def get_basic_interface_file_impl(data, scope, interface_scope):
             get_basic_interface_file_impl(data, scope, entry)
             scope.close()
         elif util.is_class(entry) or util.is_struct(entry):
-            add_interface(scope, entry, entry.name + data.detail_extension)
+            add_interface(data, scope, entry, entry.name + data.detail_extension)
         else:
             scope.add(entry)
 
 
 def get_basic_interface_file(data, interface_scope):
     main_scope = cpp_file_parser.Namespace('global')
-    main_scope.add( cpp_file_parser.InclusionDirective('"handles/handle_for_' + data.interface_file + '"') )
+    main_scope.add(cpp_file_parser.InclusionDirective('"handles/handle_for_' + data.interface_file + '"'))
+    if data.small_buffer_optimization:
+        main_scope.add(cpp_file_parser.InclusionDirective('<array>'))
+    if not data.copy_on_write:
+        main_scope.add(cpp_file_parser.InclusionDirective('<memory>'))
     get_basic_interface_file_impl(data, main_scope, interface_scope)
     return main_scope
+
+
+def get_source_filename(header_filename):
+    for ending in ['.hh','.h','.hpp']:
+        header_filename = header_filename.replace(ending,'.cpp')
+    return header_filename
 
 
 def write_file(args):
@@ -182,28 +222,23 @@ def write_file(args):
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
 
-    scope = get_basic_interface_file(data, processor.content)
-    to_string.write_scope(scope, data.interface_file)
-    util.clang_format(data.interface_file)
+    comments = parser_addition.extract_comments(data.file)
 
-# def write_file2(args, indentation):
-#     if args.header_only:
-#         args.interface_form = args.interface_form.replace('.hpp','_header_only.hpp')
-#     data = parse_args(args)
-#     comments = extract_comments(data.file)
-#
-#     interface_headers = extract_includes(data.file)
-#     interface_headers.append('#include "' + args.handle_file + '"')
-#
-#     file_writer = get_filewriter(data, indentation, comments)
-#     file_writer.process_open_include_guard(args.file)
-#     file_writer.process_headers(interface_headers)
-#
-#     file_parser = GenericFileParser(file_writer,data)
-#     file_parser.parse()
-#
-#     file_writer.process_close_include_guard()
-#     file_writer.write_to_file()
+    scope = get_basic_interface_file(data, processor.content)
+    scope.visit(cpp_file_parser.SortClass())
+    if data.header_only:
+        to_string.write_scope(scope, data.interface_file)
+        util.clang_format(data.interface_file)
+    else:
+        to_string.write_scope(scope, data.interface_file, to_string.VisitorForHeaderFile(comments))
+        util.clang_format(data.interface_file)
+        source_filename = get_source_filename(data.interface_file)
+
+        scope.content[0] = cpp_file_parser.InclusionDirective('"' + data.interface_file + '"')
+        if not data.copy_on_write:
+            scope.content.pop(1)
+        to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile())
+        util.clang_format(source_filename)
 
 
 # main
@@ -213,7 +248,5 @@ if __name__ == "__main__":
     if args.clang_path:
         Config.set_library_path(args.clang_path)
 
-    indentation = ' ' * args.indent
-
-    write_file(args,indentation)
+    write_file(args)
 

@@ -260,16 +260,6 @@ def is_destructor(kind):
     return kind == CursorKind.DESTRUCTOR
 
 
-def print_function(fun):
-    print "Function:"
-    print 'signature: \t\t' + fun.signature
-    print 'name: \t\t\t' + fun.name
-    print 'arg names: \t\t' + fun.argument_names
-    print 'return str: \t\t' + fun.return_str
-    print 'const qualifier: \t' + fun.const_qualifier
-    print ''
-
-
 class SpecifierParser(object):
     def __init__(self):
         self.last = ''
@@ -296,31 +286,6 @@ def make_type(spellings):
         if spelling == 'const' or spelling == 'typename':
             function_type += ' '
     return function_type
-
-
-def print_list(list):
-    print "list"
-    for entry in list:
-        print entry
-
-
-# def read_arguments(current_index,tokens):
-#     arguments = []
-#     counter = InTypeCounter(open_parens=1, open_brackets=0)
-#     arg_tokens = []
-#     while current_index < len(tokens):
-#         spelling = tokens[current_index].spelling
-#         counter.process(spelling)
-#         if counter.open_parens == 0:
-#             if len(arg_tokens) > 0:
-#                 arguments.append(FunctionArgument(arg_tokens))
-#             return arguments, current_index
-#         if spelling == comma and counter.initial_state():
-#             arguments.append(FunctionArgument(arg_tokens))
-#             arg_tokens = []
-#         else:
-#             arg_tokens.append(tokens[current_index])
-#         current_index += 1
 
 
 def parse_inclusion_directive(data,cursor):
@@ -359,54 +324,3 @@ def read_function_specifiers(function,tokens,index):
                 function.is_deleted = True
             last_was_equals = False
         index += 1
-#
-#
-# def function_data(data,cursor):
-#     function_name = cursor.spelling
-#     return_str = cursor.result_type.kind != TypeKind.VOID and 'return ' or ''
-#
-#     tokens = get_tokens(data.tu, cursor)
-#     str = ''
-#     constness = ''
-#
-#     identifier_regex = re.compile(r'[_a-zA-Z][_a-zA-Z0-9]*')
-#
-#     probably_args = []
-#     close_paren_seen = False
-#     for i in range(len(tokens)):
-#         spelling = tokens[i].spelling
-#         if identifier_regex.match(spelling) and i < len(tokens) - 1 and (
-#                 tokens[i + 1].spelling == comma or tokens[i + 1].spelling == close_paren):
-#             probably_args.append(spelling)
-#         if close_paren_seen and spelling == 'const':
-#             constness = 'const'
-#         if spelling == close_paren:
-#             close_paren_seen = True
-#         if spelling == open_brace or spelling == semicolon:
-#             break
-#         if i:
-#             str += ' '
-#         str += spelling
-#
-#     args = [x for x in cursor.get_arguments()]
-#     args_str = ''
-#
-#
-#     for i in range(len(args)):
-#         arg_cursor = args[i]
-#         # Sometimes, libclang gets confused.  When it does, try our best to
-#         # figure out the parameter names anyway.
-#         if arg_cursor.spelling == '':
-#             args_str = ', '.join(probably_args)
-#             os.write(2,
-#                      '''An error has occurred in determining the name of parameter {} of function
-#                      {}. This usually occurs when libclang can't figure out the type of the
-#                      parameter (often due to a typo or missing include somewhere).  We're using
-#                      these possibly-wrong, heuristically-determined parameter names instead:
-#                      '{}'.\n'''.format(i, function_name, args_str))
-#             break
-#         if i:
-#             args_str += ', '
-#         args_str += arg_cursor.spelling
-#
-#     return Function( function_name, str, args_str, return_str, constness == 'const')

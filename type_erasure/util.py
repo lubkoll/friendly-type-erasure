@@ -32,23 +32,6 @@ class client_data:
         self.current_cursor = None
 
 
-def prepare_form_impl (form):
-    form = form.replace('{', '{{')
-    form = form.replace('}', '}}')
-    regex = re.compile(r'%(\w+)%')
-    return regex.sub(r'{\1}', form)[:-1]
-
-
-def prepare_form (form):
-    if type(form) == str:
-        return prepare_form_impl(form)
-    else:
-        for i in range(len(form)):
-            form[i] = prepare_form_impl(form[i])
-        return \
-            form
-
-
 def print_diagnostic(diag):
     severities = ['ignored', 'note', 'warning', 'error', 'fatal error']
     file_ = diag.location.file
@@ -123,7 +106,6 @@ def is_function(entry):
 def get_comment(comments, name):
     if comments is not None:
         for comment in comments:
-            print "comparing " + name + " and " + comment.name
             if same_signature(name,comment.name):
                 out = ''
                 for line in comment.comment:
@@ -155,6 +137,12 @@ def add_default_arguments(parser):
                         help='namespace containing implementations of handles, resp tables for the function pointers')
     parser.add_argument('--vtable', action='store_true',
                         help='use vtable-based type erasure')
+    parser.add_argument('-cow', '--copy-on-write', nargs='?', type=str, required=False,
+                        const=True, default=False)
+    parser.add_argument('-sbo', '--small-buffer-optimization', nargs='?', type=bool, required=False,
+                        const=True, default=False,
+                        help='enables small buffer optimization')
+
 
 def parse_default_args(args, data):
     data.non_copyable = args.non_copyable
@@ -164,6 +152,22 @@ def parse_default_args(args, data):
     data.file = args.file
     data.vtable = args.vtable
     data.clang_args = args.clang_args
+    data.copy_on_write = args.copy_on_write
+    data.small_buffer_optimization = args.small_buffer_optimization
     return data
 
     return data
+
+
+def get_return_type(data, classname):
+    if data.copy_on_write:
+        return 'std :: shared_ptr < HandleBase > '
+    else:
+        return classname + ' * '
+
+
+def get_generator(data, classname):
+    if data.copy_on_write:
+        return 'std :: make_shared < typename std :: decay < ' + classname + ' > :: type >'
+    else:
+        return 'new typename std :: decay < ' + classname + ' > :: type'

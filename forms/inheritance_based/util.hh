@@ -2,7 +2,9 @@
 
 #include <cassert>
 #include <cstddef>
+#include <memory>
 #include <type_traits>
+#include <utility>
 
 namespace type_erasure_detail
 { 
@@ -27,7 +29,7 @@ namespace type_erasure_detail
               class StackAllocatedHandle,
               class HeapAllocatedHandle,
               typename T, typename Buffer>
-    inline HandleBase* clone_impl ( T&& value, Buffer& buffer )
+    inline HandleBase* clone_into ( T&& value, Buffer& buffer )
     {
         using PlainType = typename std::decay<T>::type;
 
@@ -37,6 +39,20 @@ namespace type_erasure_detail
         }
 
         return new HeapAllocatedHandle( std::forward<T>(value) );
+    }
+
+    template <class HandleBase,
+              class StackAllocatedHandle,
+              class HeapAllocatedHandle,
+              typename T, typename Buffer>
+    inline std::shared_ptr<HandleBase> clone_into_shared_ptr ( T&& value, Buffer& buffer )
+    {
+        if ( sizeof( StackAllocatedHandle ) <= sizeof( Buffer ) ) {
+            new (&buffer) StackAllocatedHandle( std::forward<T>(value) );
+            return std::shared_ptr<StackAllocatedHandle>( std::shared_ptr<StackAllocatedHandle>(), static_cast<StackAllocatedHandle*>( static_cast<void*>(&buffer) ) );
+        }
+
+        return std::make_shared<HeapAllocatedHandle>( std::forward<T>(value) );
     }
 
     template <typename T>

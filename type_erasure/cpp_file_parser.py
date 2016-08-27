@@ -4,20 +4,28 @@ import util
 import parser_addition
 from clang.cindex import TypeKind
 
-scoped_types = [ 'namespace', 'class', 'struct' ]
-INCLUDE_DIRECTIVE = 'include'
-ACCESS_SPECIFIER = 'access specifier'
-VARIABLE = 'variable'
-STATIC_VARIABLE = 'static variable'
-FUNCTION = 'function'
-CONSTRUCTOR = 'constructor'
-DESTRUCTOR = 'destructor'
-NAMESPACE = 'namespace'
-CLASS = 'class'
-STRUCT = 'struct'
-PRIVATE = 'private'
-PUBLIC = 'public'
-PROTECTED = 'protected'
+INCLUDE_DIRECTIVE       = 'include'
+ACCESS_SPECIFIER        = 'access specifier'
+ALIAS                   = 'alias'
+CLASS                   = 'class'
+CONSTRUCTOR             = 'constructor'
+CONSTRUCTOR_TEMPLATE    = 'constructor template'
+DESTRUCTOR              = 'destructor'
+FUNCTION                = 'function'
+FUNCTION_TEMPLATE       = 'function template'
+NAMESPACE               = 'namespace'
+PRIVATE                 = 'private'
+PROTECTED               = 'protected'
+PUBLIC                  = 'public'
+STATIC_VARIABLE         = 'static variable'
+STRUCT                  = 'struct'
+VARIABLE                = 'variable'
+COMMENT                 = 'comment'
+SEPARATOR               = 'separator'
+scoped_types            = [NAMESPACE, CLASS, STRUCT]
+signedness              = ['signed', 'unsigned']
+builtin_integer_types   = ['int', 'short', 'long', 'long long', 'char', 'wchar_t', 'wchar16_t', 'wchar32_t']
+builtin_float_types     = ['float', 'double', 'long double' ]
 
 
 def is_class(entry):
@@ -38,34 +46,62 @@ class ScopeEntry(object):
         self.type = type
         self.value = value
 
-    def to_string_visit(self,visitor):
-        return visitor.to_string(self.value)
+    def visit(self,visitor):
+        return visitor.visit(self)
+
+    def __str__(self):
+        return self.value
+
+
+class Comment(ScopeEntry):
+    def __init__(self,comment):
+        super(Comment,self).__init__(COMMENT, comment)
+
+    def visit(self,visitor):
+        return visitor.visit_comment(self)
+
+    def __str__(self):
+        comment = ''
+        for line in self.value.comment:
+            comment += line + '\n'
+        return comment
+
+
+class Separator(ScopeEntry):
+    def __init__(self):
+        super(Separator,self).__init__(SEPARATOR,'\n')
 
 
 class AccessSpecifier(ScopeEntry):
-    def __init__(self,value):
-        super(AccessSpecifier,self).__init__(ACCESS_SPECIFIER,value)
+    def __init__(self,access_specifier):
+        super(AccessSpecifier,self).__init__(ACCESS_SPECIFIER,access_specifier)
 
-    def to_string_visit(self,visitor):
-        return visitor.access_specifier_to_string(self)
+    def visit(self,visitor):
+        return visitor.visit_access_specifier(self)
 
 
 class InclusionDirective(ScopeEntry):
-    def __init__(self,value):
-        super(InclusionDirective,self).__init__(INCLUDE_DIRECTIVE,value)
+    def __init__(self,inclusion_directive):
+        super(InclusionDirective,self).__init__(INCLUDE_DIRECTIVE,inclusion_directive)
 
-    def to_string_visit(self,visitor):
-        return visitor.inclusion_directive_to_string(self)
+    def visit(self,visitor):
+        return visitor.visit_inclusion_directive(self)
 
 
 class Variable(ScopeEntry):
-    def __init__(self,value):
-        super(Variable,self).__init__(VARIABLE,value)
+    def __init__(self,variable):
+        super(Variable,self).__init__(VARIABLE,variable)
+
+    def visit(self,visitor):
+        return visitor.visit_variable(self)
 
 
 class StaticVariable(ScopeEntry):
-    def __init__(self,value):
-        super(StaticVariable,self).__init__(STATIC_VARIABLE,value)
+    def __init__(self,static_variable):
+        super(StaticVariable,self).__init__(STATIC_VARIABLE,static_variable)
+
+    def visit(self,visitor):
+        return visitor.visit_static_variable(self)
 
 
 class Scope(object):
@@ -104,32 +140,32 @@ class Class(Scope):
     def __init__(self, name):
         super(Class,self).__init__(CLASS, name)
 
-    def to_string_visit(self,visitor):
-        return visitor.class_to_string(self)
+    def visit(self,visitor):
+        return visitor.visit_class(self)
 
 
 class Struct(Scope):
     def __init__(self, name):
         super(Struct,self).__init__(STRUCT, name)
 
-    def to_string_visit(self,visitor):
-        return visitor.class_to_string(self)
+    def visit(self,visitor):
+        return visitor.visit_class(self)
 
 
 class TemplateStruct(Scope):
     def __init__(self, name, tokens=None):
-        self.tokens = ( tokens and [SimpleToken(token.spelling) for token in tokens] or [] )
+        self.tokens = (tokens and [SimpleToken(token.spelling) for token in tokens] or [])
         super(TemplateStruct,self).__init__(STRUCT, name)
 
-    def to_string_visit(self,visitor):
-        return visitor.template_class_to_string(self)
+    def visit(self,visitor):
+        return visitor.visit_template_class(self)
 
 class Namespace(Scope):
     def __init__(self, name):
         super(Namespace,self).__init__(NAMESPACE, name)
 
-    def to_string_visit(self,visitor):
-        return visitor.namespace_to_string(self)
+    def visit(self,visitor):
+        return visitor.visit_namespace(self)
 
 
 class InTypeCounter(object):
@@ -201,7 +237,7 @@ def get_declaration_end_index(name, tokens):
             break
 
     for i in range(index, len(tokens)):
-        if tokens[i].spelling in [clang_util.open_brace, clang_util.semicolon]:
+        if tokens[i].spelling in [clang_util.open_brace, clang_util.semicolon, ':']:
             return i
 
 
@@ -249,6 +285,20 @@ def get_name_index(function_argument):
             return i - 1
 
     return len(function_argument.tokens) - 1
+
+
+class Alias(Tokens):
+    def __init__(self, name, tokens):
+        self.type = ALIAS
+        self.name = name
+        super(Alias,self).__init__(tokens)
+
+    def visit(self,visitor):
+        return visitor.visit_alias(self)
+
+
+def get_alias_from_text(name, text):
+    return Alias(name, [SimpleToken(spelling) for spelling in text.split(' ')])
 
 
 class FunctionArgument(Tokens):
@@ -316,6 +366,28 @@ def get_function_arguments_in_single_call(function):
     return args_in_single_call
 
 
+def is_deleted(function):
+    return len(function.tokens) > 5 and util.concat(function.tokens[-3:], ' ') == '= delete ; '
+
+
+def is_defaulted(function):
+    return len(function.tokens) > 5 and util.concat(function.tokens[-3:], ' ') == '= default ; '
+
+
+def is_constexpr(function):
+    return len(function.tokens) > 4 and (function.tokens[0].spelling  == 'constexpr' or
+                                         function.tokens[1].spelling == 'constexpr')
+
+
+def is_const(function):
+    index = get_declaration_end_index(function.name, function.tokens)
+    while function.tokens[index].spelling != clang_util.close_paren:
+        if function.tokens[index].spelling == 'const':
+            return True
+        index -= 1
+    return False
+
+
 class Function(Tokens):
     def __init__(self, classname, functionname, return_str, tokens, function_type='function'):
         self.type = function_type
@@ -343,16 +415,21 @@ class Function(Tokens):
         if self.classname == '':
             return self.get_in_place_definition()
         definition = ''
+        index, offset = find_function_name(self.name, self.tokens)
         for i in range(len(self.tokens)):
             spelling = self.tokens[i].spelling
-            if spelling == self.name and self.tokens[i+1].spelling == clang_util.open_paren:
-                definition += self.classname + '::' + spelling
+            if spelling == 'explicit':
+                continue
+            if i == index:
+                definition += self.classname + '::' + spelling + ' '
             else:
                 definition += spelling + ' '
         return definition + '\n'
 
-    def to_string_visit(self,visitor):
-        return visitor.function_to_string(self)
+    def visit(self,visitor):
+        if self.type in [FUNCTION_TEMPLATE, CONSTRUCTOR_TEMPLATE]:
+            return visitor.visit_template_function(self)
+        return visitor.visit_function(self)
 
 
 def get_function_from_text(classname, functionname, return_str, text, function_type='function'):
@@ -397,14 +474,14 @@ class CppFileParser(file_parser.FileProcessor):
         self.process_function(data, cursor)
 
     def process_type_alias(self,data,cursor):
-        self.content.add( ScopeEntry( 'alias', clang_util.get_type_alias_or_typedef(data.tu, cursor) ) )
+        self.content.add(Alias(cursor.spelling, clang_util.get_tokens(data.tu,cursor)))
+        #self.content.add( Alias( clang_util.get_type_alias_or_typedef(data.tu, cursor) ) )
 
     def process_variable_declaration(self,data,cursor):
         variable_declaration = clang_util.get_variable_declaration(data.tu, cursor)
         # in case that an underlying type is specified,
         # clang interprets enums at variables.
         # filter out these cases:
-        print "variable: " + variable_declaration
         if 'enum ' in variable_declaration:
             #TODO try to find a workaround for this
             return
@@ -424,3 +501,173 @@ class CppFileParser(file_parser.FileProcessor):
 
     def process_access_specifier(self, data, cursor):
         self.content.add( AccessSpecifier( clang_util.get_tokens(data.tu, cursor)[0].spelling ) )
+
+
+class Visitor(object):
+    def visit(self,visited):
+        pass
+
+    def visit_function(self,function):
+        return self.visit(function)
+
+    def visit_template_function(self,function):
+        return self.visit_function(function)
+
+    def visit_constructor(self,constructor):
+        return self.visit_function(constructor)
+
+    def visit_destructor(self,destructor):
+        return self.visit_function(destructor)
+
+    def visit_operator(self,operator):
+        return self.visit_function(operator)
+
+    def visit_class(self,class_):
+        return self.visit(class_)
+
+    def visit_template_class(self,template_class):
+        return self.visit(template_class)
+
+    def visit_namespace(self,namespace):
+        return self.visit(namespace)
+
+    def visit_inclusion_directive(self,inclusion_directive):
+        return self.visit(inclusion_directive)
+
+    def visit_access_specifier(self,access_specifier):
+        return self.visit(access_specifier)
+
+    def visit_variable(self,variable):
+        return self.visit(variable)
+
+    def visit_static_variable(self,variable):
+        return self.visit(variable)
+
+    def visit_alias(self,alias):
+        return self.visit(alias)
+
+    def visit_comment(self,comment):
+        return self.visit(comment)
+
+
+class RecursionVisitor(Visitor):
+    def visit_class(self,class_):
+        for entry in class_.content:
+            entry.visit(self)
+
+    def visit_template_class(self,template_class):
+        for entry in template_class.content:
+            entry.visit(self)
+
+    def visit_namespace(self,namespace):
+        for entry in namespace.content:
+            entry.visit(self)
+
+
+class ExtractPublicProtectedPrivateSections(RecursionVisitor):
+    def __init__(self):
+        self.private_section = []
+        self.protected_section = []
+        self.public_section = []
+        self.access_specifier = PRIVATE
+
+    def visit_access_specifier(self,access_specifier):
+        self.access_specifier = access_specifier.value
+
+    def visit(self,entry):
+        if self.access_specifier == PRIVATE:
+            self.private_section.append(entry)
+        elif self.access_specifier == PROTECTED:
+            self.protected_section.append(entry)
+        else:
+            self.public_section.append(entry)
+
+
+def append_comment(comment,group):
+    if comment:
+        group.append(comment)
+    return None
+
+
+class ExtractTypes(Visitor):
+    def __init__(self):
+        self.aliases = []
+        self.static_variables = []
+        self.constructors = []
+        self.destructor = []
+        self.operators = []
+        self.functions = []
+        self.variables = []
+        self.comment = None
+
+    def visit_comment(self,comment):
+        self.comment = comment
+
+    def visit_function(self,function):
+        if function.type in [FUNCTION, FUNCTION_TEMPLATE]:
+            if function.name.startswith('operator'):
+                self.comment = append_comment(self.comment, self.operators)
+                self.operators.append(function)
+            else:
+                self.comment = append_comment(self.comment, self.functions)
+                self.functions.append(function)
+        elif function.type in [CONSTRUCTOR, CONSTRUCTOR_TEMPLATE]:
+            self.comment = append_comment(self.comment, self.constructors)
+            self.constructors.append(function)
+        elif function.type == DESTRUCTOR:
+            self.comment = append_comment(self.comment, self.destructor)
+            self.destructor.append(function)
+
+    def visit_variable(self,variable):
+        self.comment = append_comment(self.comment,self.variables)
+        self.variables.append(variable)
+
+    def visit_static_variable(self,variable):
+        self.comment = append_comment(self.comment,self.static_variables)
+        self.static_variables.append(variable)
+
+    def visit_alias(self,alias):
+        self.comment = append_comment(self.comment,self.aliases)
+        self.aliases.append(alias)
+
+
+def extend_section(new_section, section_part):
+    if new_section and section_part:
+        new_section.append(Separator())
+    new_section.extend(section_part)
+
+
+def sort_section(section):
+    type_extractor = ExtractTypes()
+    for entry in section:
+        entry.visit(type_extractor)
+
+    new_section = []
+    new_section.extend(type_extractor.aliases)
+    extend_section(new_section, type_extractor.static_variables)
+    extend_section(new_section, type_extractor.constructors)
+    extend_section(new_section, type_extractor.destructor)
+    extend_section(new_section, type_extractor.operators)
+    extend_section(new_section, type_extractor.functions)
+    extend_section(new_section, type_extractor.variables)
+    return new_section
+
+
+class SortClass(RecursionVisitor):
+    def visit_class(self,class_):
+        section_extractor = ExtractPublicProtectedPrivateSections()
+        class_.visit(section_extractor)
+        section_extractor.public_section = sort_section(section_extractor.public_section)
+        section_extractor.protected_section = sort_section(section_extractor.protected_section)
+        section_extractor.private_section = sort_section(section_extractor.private_section)
+
+        class_.content = []
+        if section_extractor.public_section:
+            class_.content.append(AccessSpecifier(PUBLIC))
+            class_.content.extend(section_extractor.public_section)
+        if section_extractor.protected_section:
+            class_.content.append(AccessSpecifier(PROTECTED))
+            class_.content.extend(section_extractor.protected_section)
+        if section_extractor.private_section:
+            class_.content.append(AccessSpecifier(PRIVATE))
+            class_.content.extend(section_extractor.private_section)

@@ -1,9 +1,10 @@
+import copy
 import re
 
 class Comment:
-    def __init__(self):
-        self.comment = []
-        self.name = ""
+    def __init__(self, comment=[], name=""):
+        self.comment = copy.deepcopy(comment)
+        self.name = copy.deepcopy(name)
 
     def __str__(self):
         result = "Name:\n"  + self.name + "\n"
