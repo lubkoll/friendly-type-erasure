@@ -4,11 +4,8 @@
 #include "../mock_fooable.hh"
 #include "../util.hh"
 
-namespace
-{
-    using Basic::Fooable;
-    using Mock::MockFooable;
-}
+using Fooable = Basic::Fooable;
+using Mock::MockFooable;
 
 TEST( TestBasicFooable_HeapAllocations, Empty )
 {

@@ -50,12 +50,12 @@ matrix:
     # Linux
     # GCC 5
     - os: linux
-      env: COMPILER=g++-5
+      env: COMPILER=g++-5 CCOMPILER=gcc-5
       compiler: gcc
 
     # GCC 6
     - os: linux
-      env: COMPILER=g++-6
+      env: COMPILER=g++-6 CCOMPILER=gcc-6
       compiler: gcc
       
     # Clang 3.6

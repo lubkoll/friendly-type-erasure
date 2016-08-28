@@ -1,3 +1,5 @@
+#pragma once
+
 #define CHECK_HEAP_ALLOC(expression, expected_allocations) \
     reset_heap_allocations(); \
     expression; \
@@ -30,12 +32,12 @@ inline void* operator new[] (std::size_t size)
     return malloc(size);
 }
 
-inline void operator delete (void * ptr)
+inline void operator delete (void * ptr) noexcept
 {
     free(ptr);
 }
 
-inline void operator delete[] (void * ptr)
+inline void operator delete[] (void * ptr) noexcept
 {
     free(ptr);
 }

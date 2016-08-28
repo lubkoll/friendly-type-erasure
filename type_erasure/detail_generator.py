@@ -180,7 +180,7 @@ class FunctionPointerExtractor(cpp_file_parser.RecursionVisitor):
         start_index = cpp_file_parser.get_arguments_end_index(function.name, function.tokens)
         end_index = cpp_file_parser.get_declaration_end_index(function.name, function.tokens)
         for token in function.tokens[start_index:end_index]:
-            if token.spelling != 'const':
+            if token.spelling not in ['const','noexcept']:
                 function_pointer_alias_definition += token.spelling + ' '
         function_pointer_alias_definition += ';'
 
@@ -204,7 +204,7 @@ def add_table(data, scope, class_scope):
             scope.add(cpp_file_parser.get_alias_from_text('clone_into_function', clone_into_function))
             scope.add(cpp_file_parser.Variable('clone_into_function clone_into;'))
     else:
-        delete_function = 'using delete_function = void ( * ) ( void * ) noexcept ;'
+        delete_function = 'using delete_function = void ( * ) ( void * ) ;'
         scope.add(cpp_file_parser.get_alias_from_text('delete_function', delete_function))
         scope.add(cpp_file_parser.Variable('delete_function del;'))
         clone_function = 'using clone_function = void * ( * ) ( void * ) ;'
