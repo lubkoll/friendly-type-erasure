@@ -82,7 +82,8 @@ def concat(tokens,spacing=''):
 
 
 def clang_format(filename):
-    call(["clang-format-3.8", '-i', filename])
+    pass
+#    call(["clang-format-3.8", '-i', filename])
 
 
 def indent_lines(lines, data, indent):
