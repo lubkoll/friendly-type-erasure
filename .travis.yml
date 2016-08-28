@@ -110,7 +110,9 @@ install:
     else
       if ! brew ls --version cmake &>/dev/null; then brew install cmake; fi
       brew install python
-      brew install clang-format
+      CLANG_FORMAT_URL="http://llvm.org/releases/3.8.0/clang+llvm-3.8.0-macosx-apple-darwin.tar.xz"
+      travis_retry wget --no-check-certificate --quiet -O - ${CLANG_FORMAT_URL} | tar xvfJ clang-format/clang-format.tar.xz -C ./clang-format
+      ln -s $(pwd)/$(find clang-format | grep bin/clang-format$) ~/bin/clang-format
     fi
   - sudo pip install clang
   - git clone https://github.com/google/googletest.git
