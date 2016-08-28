@@ -1,45 +1,11 @@
 #!/usr/bin/env python
 
-import argparse
 import code
 import cpp_file_parser
 import file_parser
 import parser_addition
 import to_string
 import util
-
-
-def add_arguments(parser):
-    parser.add_argument('--interface-file', type=str, required=False, help='write output to given file')
-    parser.add_argument('--headers', type=str, required=False,
-                        help='file containing headers to prepend to the generated code')
-    parser.add_argument('--header-only', action='store_true',
-                        help='disables generation of source files')
-    parser.add_argument('--buffer', nargs='?', type=str, required=False,
-                        default='128',
-                        help='buffer size or c++-macro specifying the buffer size')
-
-
-def create_parser():
-    parser = argparse.ArgumentParser(description='Generates interface for type-erased C++ code.')
-    add_default_arguments(parser)
-    add_arguments(parser)
-    return parser
-
-
-def parse_additional_args(args, data):
-    data.interface_file = args.interface_file
-    data.header_only = args.header_only
-    data.buffer = args.buffer
-    return data
-
-
-def parse_args(args):
-    data = util.client_data()
-    data = util.parse_default_args(args, data)
-    data = parse_additional_args(args, data)
-    data.buffer = args.buffer
-    return data
 
 
 def add_aliases(data, scope, detail_namespace):
@@ -396,8 +362,7 @@ def get_source_filename(header_filename):
     return header_filename
 
 
-def write_file(args):
-    data = parse_args(args)
+def write_file(data):
     processor = cpp_file_parser.CppFileParser()
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
@@ -417,14 +382,3 @@ def write_file(args):
             scope.content.pop(1)
         to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile())
         util.clang_format(source_filename)
-
-
-# main
-if __name__ == "__main__":
-    parser = create_parser()
-    args = parser.parse_args()
-    if args.clang_path:
-        Config.set_library_path(args.clang_path)
-
-    write_file(args)
-

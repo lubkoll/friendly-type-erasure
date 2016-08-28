@@ -1,37 +1,11 @@
 #!/usr/bin/env python
 
-import argparse
 import code
 import clang
 import to_string
 import util
 import file_parser
 import cpp_file_parser
-
-
-def add_arguments(parser):
-    parser.add_argument('--handle-file', nargs='?', type=str, required=False,
-                        default='handle.hh',
-                        help='write output to given file')
-
-
-def create_parser():
-    parser = argparse.ArgumentParser(description='Generates handles for type-erased C++ code.')
-    util.add_default_arguments(parser)
-    add_arguments(parser)
-    return parser
-
-
-def parse_additional_args(args,data):
-    data.handle_file = args.handle_file
-    return data
-
-
-def parse_args(args):
-    data = util.client_data()
-    data = util.parse_default_args(args,data)
-    data = parse_additional_args(args,data)
-    return data
 
 
 class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
@@ -302,8 +276,7 @@ def get_detail_file(data, interface_scope):
     return main_scope
 
 
-def write_file(args):
-    data = parse_args(args)
+def write_file(data):
     processor = cpp_file_parser.CppFileParser()
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
@@ -311,12 +284,3 @@ def write_file(args):
     scope = get_detail_file(data, processor.content)
     to_string.write_scope(scope, data.handle_file)
     util.clang_format(data.handle_file)
-
-
-if __name__ == "__main__":
-    parser = create_parser()
-    args = parser.parse_args()
-    if args.clang_path:
-        Config.set_library_path(args.clang_path)
-
-    write_file(args)
