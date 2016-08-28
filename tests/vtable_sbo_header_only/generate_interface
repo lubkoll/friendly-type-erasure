@@ -4,5 +4,5 @@ HANDLE_FOLDER=$1
 INTERFACE_FILE=$2
 GIVEN_INTERFACE=$3
 
-python2 ../../../type_erase.py --vtable -sbo --header-only --handle-folder $HANDLE_FOLDER --handle-file handles/execution_wrapper_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
+python2 ../../../type_erase.py --vtable -sbo --header-only --handle-folder $HANDLE_FOLDER --handle-file handles/execution_wrapper_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE --clang-path $4 $GIVEN_INTERFACE
 

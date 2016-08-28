@@ -121,9 +121,8 @@ script:
   - cd tests
   - |
     if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
-      mv run run.command
-      ./run.command
+      -/run /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib
     else
-      ./run
+      ./run /usr/lib/llvm-3.8/lib
     fi
 #  - rm -rf build && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ./unit_tests

@@ -3,6 +3,7 @@
 HANDLE_FOLDER=handles
 INTERFACE_FILE=interface.hh
 GIVEN_INTERFACE=plain_interface.hh
+CLANG_PATH=$1
 
 echo $CWD
 
@@ -13,7 +14,7 @@ function prepare_test_case {
   cd $1
   mkdir $HANDLE_FOLDER
   ../../generate_given_interface $2 $GIVEN_INTERFACE
-  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE
+  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE $CLANG_PATH
   cd ..
 }
 
@@ -24,7 +25,7 @@ function prepare_vtable_test_case {
   cd $1
   mkdir $HANDLE_FOLDER
   ../../generate_given_interface $2 $GIVEN_INTERFACE
-  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE
+  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE $CLANG_PATH
   cd ..
 }
 
