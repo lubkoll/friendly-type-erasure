@@ -38,14 +38,11 @@ class Visitor(cpp_file_parser.Visitor):
     def visit_comment(self,comment):
         str = ''
         for line in comment.value.comment:
-            str += line + '\n'
+            str += line
         return str
 
 
 class VisitorForHeaderFile(Visitor):
-    def __init__(self, comments=None):
-        self.comments = comments
-
     def visit_alias(self,alias):
         return util.concat(alias.tokens, ' ') + '\n'
 
@@ -53,25 +50,14 @@ class VisitorForHeaderFile(Visitor):
         return self.visit(variable)
 
     def visit_function(self, function):
-        code = function.get_declaration()
-        if self.comments:
-            comment = util.get_comment(self.comments,code)
-            code = comment + code
+        code = function.get_declaration() + ';\n'
         return code + '\n'
 
     def visit_template_function(self, function):
-       declaration = function.get_declaration()
-       comment = ''
-       if self.comments:
-           comment = util.get_comment(self.comments,declaration)
-       return comment + function.get_in_place_definition() + '\n'
+       return function.get_in_place_definition() + '\n'
 
     def visit_class(self, class_object):
         code = class_object.type + ' ' + class_object.name
-        if self.comments:
-            comment = util.get_comment(self.comments,code)
-            code = comment + code
-
         code += '\n{\n'
         for entry in class_object.content:
             code += entry.visit(self)
@@ -82,9 +68,6 @@ class VisitorForHeaderFile(Visitor):
         code = ''
         if namespace.name != 'global':
             code = '\nnamespace ' + namespace.name
-            if self.comments:
-                comment = util.get_comment(self.comments,code)
-                code = comment + code
             code += '\n{\n'
 
         for entry in namespace.content:

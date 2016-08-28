@@ -160,6 +160,11 @@ class TemplateStruct(Scope):
     def visit(self,visitor):
         return visitor.visit_template_class(self)
 
+
+def get_template_struct_from_text(name, text):
+    return TemplateStruct(name, [SimpleToken(spelling) for spelling in text.split(' ')])
+
+
 class Namespace(Scope):
     def __init__(self, name):
         super(Namespace,self).__init__(NAMESPACE, name)
@@ -403,7 +408,7 @@ class Function(Tokens):
                 self.tokens.pop(index-2)
 
     def get_declaration(self):
-        return util.concat(self.tokens[:get_declaration_end_index(self.name, self.tokens)], ' ') + ';\n'
+        return util.concat(self.tokens[:get_declaration_end_index(self.name, self.tokens)], ' ')
 
     def get_in_place_definition(self):
         definition = ''

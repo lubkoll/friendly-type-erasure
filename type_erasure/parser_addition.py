@@ -1,5 +1,6 @@
 import copy
 import re
+from util import trim, ltrim
 
 class Comment:
     def __init__(self, comment=[], name=""):
@@ -14,14 +15,6 @@ class Comment:
         return result
 
 
-def trim(string):
-    return string.strip(' \n\r\t')
-
-
-def ltrim(string):
-	return string.lstrip(' \t')
-
-
 def is_single_line_comment(line):
     single_line_comments = ["///", "//!"]
     line = trim(line)
@@ -29,6 +22,7 @@ def is_single_line_comment(line):
         if line.startswith(prefix):
             return True
     return False
+
 
 def is_multi_line_comment(line,in_multi_line_comment):
     line = trim(line)
@@ -42,6 +36,7 @@ def is_multi_line_comment(line,in_multi_line_comment):
 
 def is_comment(line, in_multi_line_comment):
     return is_single_line_comment(line) or is_multi_line_comment(line,in_multi_line_comment)
+
 
 def is_template(line):
     line = trim(line)
@@ -99,8 +94,10 @@ def read_name(file, line):
         file.readline()
 
     name = trim(name)
-    if name.endswith(";\n"):
-        name = name[0:len(name)-2] + "\n"
+    if name.endswith(';\n'):
+        name = name[:-2] + '\n'
+    if name.endswith(';'):
+        name = name[:-1]
     return trim(name)
 
 
@@ -124,47 +121,5 @@ def extract_comments(filename):
             comments.append(comment)
     file.close()
 
-#    for comment in comments:
-#        print(comment)
-
     return comments
 
-
-def extract_includes(filename):
-    includes = []
-    file = open(filename, 'r+')
-    while True:
-        line = file.readline()
-        if not line: break
-        line = ltrim(line)
-        if line.startswith('#include '):
-            includes.append(trim(line))
-        
-
-    file.close()
-
-    return includes
-
-
-def extract_include_guard(filename):
-    # detect classical include guard
-    archetypes = open(filename).read()
-    guard_regex = re.compile(r'#ifndef\s+([^\s]+)[^\n]*\n#define\s+\1')
-    match = guard_regex.search(archetypes)
-    if match and match.start() == archetypes.index('#'):
-        return '''#ifndef {0}
-#define {0}
-
-'''.format(match.group(1))
-
-    # detect pragma once include guard
-    guard_regex = re.compile(r'#pragma\s+once\s+')
-    match = guard_regex.search(archetypes)
-    if match and match.start() == archetypes.index('#'):
-        return '#pragma once\n\n'
-    
-    return None
-
-
-if __name__ == "__main__":
-    extract_comments("test.hh")

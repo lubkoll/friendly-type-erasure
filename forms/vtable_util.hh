@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iostream>
+#include <cassert>
 #include <memory>
 
 namespace type_erasure_vtable_detail
@@ -13,7 +13,7 @@ namespace type_erasure_vtable_detail
     }
 
     template < class T >
-    inline void clone_into_impl ( void* impl, std::shared_ptr<void>& ptr )
+    inline void clone_into_shared_ptr ( void* impl, std::shared_ptr<void>& ptr )
     {
         assert(impl);
         ptr = std::make_shared<T>( *static_cast<T*>( impl ) );
@@ -59,7 +59,6 @@ namespace type_erasure_vtable_detail
             return static_cast<const T*>( impl );
         return nullptr;
     };
-
 
 
     inline char* char_ptr ( void* ptr ) noexcept

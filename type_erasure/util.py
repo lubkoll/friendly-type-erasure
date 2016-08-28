@@ -3,7 +3,6 @@ import clang
 import os
 import re
 from subprocess import call
-from parser_addition import extract_include_guard, trim
 
 
 def trim(string):
@@ -12,6 +11,10 @@ def trim(string):
 
 def rtrim(string):
     return string.rstrip(' \n\r\t')
+
+
+def ltrim(string):
+    return string.lstrip(' \t')
 
 
 class client_data:
@@ -107,21 +110,13 @@ def get_comment(comments, name):
     if comments is not None:
         for comment in comments:
             if same_signature(name,comment.name):
-                out = ''
-                for line in comment.comment:
-                    if line.startswith('*'):
-                        out += ' '
-                    out += line
-                return out
+                return comment
     return ''
 
 
 def add_default_arguments(parser):
     parser.add_argument('--non-copyable', type=str, required=False,
                         help='set to true to generate a non-copyable interface')
-    parser.add_argument('--indent', nargs='?', type=int,
-                        const=4, default=4,
-                        help='number of spaces for indentation')
     parser.add_argument('--detail-extension', nargs='?', type=str,
                         default='Handles',
                         help='ending for namespace containing the handle or function pointer table implementation (not considered if --detail-namespace is specified)')
@@ -135,8 +130,10 @@ def add_default_arguments(parser):
     parser.add_argument('--detail-namespace', nargs='?', type=str, required=False,
                         default='',
                         help='namespace containing implementations of handles, resp tables for the function pointers')
+    parser.add_argument('--table', action='store_true',
+                        help='use function-pointer-table-based type erasure')
     parser.add_argument('--vtable', action='store_true',
-                        help='use vtable-based type erasure')
+                        help='use function-pointer-table-based type erasure')
     parser.add_argument('-cow', '--copy-on-write', nargs='?', type=str, required=False,
                         const=True, default=False)
     parser.add_argument('-sbo', '--small-buffer-optimization', nargs='?', type=bool, required=False,
@@ -146,16 +143,13 @@ def add_default_arguments(parser):
 
 def parse_default_args(args, data):
     data.non_copyable = args.non_copyable
-    data.indent = args.indent
     data.detail_extension = args.detail_extension
     data.detail_namespace = args.detail_namespace
     data.file = args.file
-    data.vtable = args.vtable
+    data.table = args.vtable
     data.clang_args = args.clang_args
     data.copy_on_write = args.copy_on_write
     data.small_buffer_optimization = args.small_buffer_optimization
-    return data
-
     return data
 
 

@@ -158,7 +158,6 @@ def get_function(function_indent, base_indent, translation_unit, cursor, class_p
             function = function[:-len(base_indent)]
             function += spelling + '\n' + indent
             if open_braces == 0:
-#                function += '\n'
                 break
         elif spelling == semicolon:
             function = function[:-1]
@@ -296,6 +295,7 @@ def parse_inclusion_directive(data,cursor):
 my_identifier_regex = re.compile(r'[_a-zA-Z][_a-zA-Z0-9]*')
 regex_for_identifier = r'[_a-zA-Z][_a-zA-Z0-9]*'
 regex_for_type = regex_for_identifier + r'\s'
+
 
 def get_function_regex(name):
     return re.compile( r'constexpr*\s*virtual\s*(.*)' + name + r'\s*\( .*(=*[_a-zA-Z][_a-zA-Z0-9]*)*\)\s*(const|noexcept|override|final|\&|\&\&)*\s*' )
