@@ -105,4 +105,4 @@ script:
   - cd $TRAVIS_BUILD_DIR
   - cd tests
   - ./run
-  - cd build && rm -rf * && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ./unit_tests
+#  - cd build && rm -rf * && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ./unit_tests
