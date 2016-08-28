@@ -119,5 +119,11 @@ install:
 script:
   - cd $TRAVIS_BUILD_DIR
   - cd tests
-  - ./run
+  - |
+    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
+      mv run run.command
+      ./run.command
+    else
+      ./run
+    fi
 #  - rm -rf build && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ./unit_tests
