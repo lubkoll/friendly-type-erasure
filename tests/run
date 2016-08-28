@@ -4,8 +4,6 @@ HANDLE_FOLDER=handles
 INTERFACE_FILE=interface.hh
 GIVEN_INTERFACE=plain_interface.hh
 
-INTERFACE_FILE_CPP=${INTERFACE_FILE:0:`expr index "$INTERFACE_FILE" .hh`-1}.cpp
-
 echo $CWD
 
 function prepare_test_case {
@@ -13,8 +11,9 @@ function prepare_test_case {
   cp ../$1/* $1/
   python2 ../generate_tests.py --namespace-name $2 --class-name "Fooable" --test-file $1/interface_test.cpp --form ../interface_test.form $3
   cd $1
+  mkdir $HANDLE_FOLDER
   ../../generate_given_interface $2 $GIVEN_INTERFACE
-  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $INTERFACE_FILE_CPP $GIVEN_INTERFACE
+  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE
   cd ..
 }
 
@@ -23,8 +22,9 @@ function prepare_vtable_test_case {
   cp ../$1/* $1/
   python2 ../generate_tests.py --namespace-name $2 --class-name "Fooable" --test-file $1/interface_test.cpp --form ../vtable_interface_test.form $3
   cd $1
+  mkdir $HANDLE_FOLDER
   ../../generate_given_interface $2 $GIVEN_INTERFACE
-  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $INTERFACE_FILE_CPP $GIVEN_INTERFACE
+  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE
   cd ..
 }
 
@@ -59,8 +59,6 @@ prepare_vtable_test_case vtable_sbo_header_only VTableSBOHeaderOnly --sbo
 
 prepare_vtable_test_case vtable_sbo_cow VTableSBOCOW --sbo
 prepare_vtable_test_case vtable_sbo_cow_header_only VTableSBOCOWHeaderOnly --sbo
-
-#prepare_test_case test Basic
 
 cd ..
 

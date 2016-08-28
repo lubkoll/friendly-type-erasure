@@ -2,12 +2,7 @@
 
 HANDLE_FOLDER=$1
 INTERFACE_FILE=$2
-INTERFACE_FILE_CPP=$3
-GIVEN_INTERFACE=$4
+GIVEN_INTERFACE=$3
 
-rm -rf $HANDLE_FOLDER 
-mkdir $HANDLE_FOLDER
-rm -f $INTERFACE_FILE
-rm -f $INTERFACE_FILE_CPP
 python2 ../../../type_erase.py --vtable -cow --handle-folder $HANDLE_FOLDER --handle-file handles/execution_wrapper_for_$INTERFACE_FILE --interface-file $INTERFACE_FILE $GIVEN_INTERFACE
 
