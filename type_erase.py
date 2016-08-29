@@ -40,12 +40,18 @@ def create_parser():
     parser.add_argument('--buffer', nargs='?', type=str, required=False,
                         default='128',
                         help='buffer size or c++-macro specifying the buffer size')
-    parser.add_argument('--handle-file', nargs='?', type=str, required=False,
-                        default='handle.hh',
-                        help='write output to given file')
-    parser.add_argument('--handle-folder', nargs='?', type=str, required=False,
+    parser.add_argument('--detail-file', nargs='?', type=str, required=False,
+                        default='detail.hh',
+                        help='file for implementation details')
+    parser.add_argument('--detail-folder', nargs='?', type=str, required=False,
                         default='handles',
-                        help='folder for handle implementations')
+                        help='folder for implementation details')
+    parser.add_argument('--util-path', nargs='?', type=str, required=False,
+                        default='utils',
+                        help='absolute path for storing utility files')
+    parser.add_argument('--util-include-path', nargs='?', type=str, required=False,
+                        default='handles',
+                        help='relative include path for utility-files')
     return parser
 
 
@@ -59,11 +65,13 @@ class Data:
         self.header_only = args.header_only
         self.non_copyable = args.non_copyable
         self.buffer = args.buffer
-        self.handle_file = args.handle_file
+        self.detail_file = args.detail_file
         self.interface_file = args.interface_file
-        self.handle_folder = args.handle_folder
+        self.detail_folder = args.detail_folder
         self.detail_extension = args.detail_extension
         self.detail_namespace = args.detail_namespace
+        self.util_path = args.detail_folder
+        self.util_include_path = args.detail_folder
         self.clang_args = args.clang_args
         self.current_namespaces = []
         self.current_struct = clang.cindex.conf.lib.clang_getNullCursor()
@@ -76,15 +84,17 @@ if __name__ == "__main__":
         Config.set_library_path(args.clang_path)
 
     if args.table or args.vtable:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.handle_folder])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.detail_folder])
+#        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.util_path])
     else:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.handle_folder])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.detail_folder])
+#        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.util_path])
 
     type_erasure.detail_generator.write_file(Data(args))
     type_erasure.interface_generator.write_file(Data(args))
 
     # format files
-    util.clang_format(data.handle_file)
-    util.clang_format(data.interface_file)
-    if not data.header_only:
-        util.clang_format(type_erasure.interface_generator.get_source_file(data.interface_file))
+    type_erasure.util.clang_format(args.detail_file)
+    type_erasure.util.clang_format(args.interface_file)
+    if not args.header_only:
+        type_erasure.util.clang_format(type_erasure.interface_generator.get_source_filename(args.interface_file))

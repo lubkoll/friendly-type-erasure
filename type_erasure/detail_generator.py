@@ -5,6 +5,7 @@ import to_string
 import util
 import file_parser
 import cpp_file_parser
+import os
 
 
 class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
@@ -269,7 +270,8 @@ def get_detail_file(data, interface_scope):
     if not data.table:
         main_scope.add( cpp_file_parser.InclusionDirective('<type_traits>') )
         main_scope.add( cpp_file_parser.InclusionDirective('<utility>') )
-        main_scope.add( cpp_file_parser.InclusionDirective('"util.hh"') )
+        util_include_dir = data.util_include_path + '/' if data.util_include_path != data.detail_folder else ''
+        main_scope.add( cpp_file_parser.InclusionDirective('"' + util_include_dir + 'util.hh"') )
 
     get_detail_file_impl(data, main_scope, interface_scope)
     return main_scope
@@ -281,4 +283,4 @@ def write_file(data):
     parser.parse()
 
     scope = get_detail_file(data, processor.content)
-    to_string.write_scope(scope, data.handle_file)
+    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file))

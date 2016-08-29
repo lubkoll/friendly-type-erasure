@@ -1,32 +1,37 @@
 #!/bin/bash
 
-HANDLE_FOLDER=handles
+DETAIL_PATH=detail
 INTERFACE_FILE=interface.hh
+HANDLE_FILE=handle_for_interface.hh
+DETAIL_FILE=detail_for_interface.hh
 GIVEN_INTERFACE=plain_interface.hh
 CLANG_PATH=$1
 
 echo $CWD
 
-function prepare_test_case {
-  rm -rf $1 && mkdir $1
-  cp ../$1/* $1/
-  python2 ../generate_tests.py --namespace-name $2 --class-name "Fooable" --test-file $1/interface_test.cpp --form ../interface_test.form $3
-  cd $1
-  mkdir $HANDLE_FOLDER
-  ../../generate_given_interface $2 $GIVEN_INTERFACE
-  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE $CLANG_PATH
+function generate_interface {
+  python2 ../../../type_erase.py $1 $2 $3 $4 --detail-folder $DETAIL_PATH --detail-file $5 --interface-file $INTERFACE_FILE --clang-path $CLANG_PATH $GIVEN_INTERFACE
   cd ..
 }
 
-function prepare_vtable_test_case {
+function generate_test_folder {
   rm -rf $1 && mkdir $1
   cp ../$1/* $1/
+  mkdir $1/$DETAIL_PATH
+}
+
+function prepare_test_case {
+  generate_test_folder $1
+  python2 ../generate_tests.py --namespace-name $2 --class-name "Fooable" --test-file $1/interface_test.cpp --form ../interface_test.form $3
+  cd $1
+  ../../generate_given_interface $2 $GIVEN_INTERFACE
+}
+
+function prepare_vtable_test_case {
+  generate_test_folder $1
   python2 ../generate_tests.py --namespace-name $2 --class-name "Fooable" --test-file $1/interface_test.cpp --form ../vtable_interface_test.form $3
   cd $1
-  mkdir $HANDLE_FOLDER
   ../../generate_given_interface $2 $GIVEN_INTERFACE
-  ./generate_interface $HANDLE_FOLDER $INTERFACE_FILE $GIVEN_INTERFACE $CLANG_PATH
-  cd ..
 }
 
 # remove previously generate files
@@ -37,29 +42,45 @@ cd gen
 
 # inheritance-based type-erased interfaces
 prepare_test_case basic Basic
+generate_interface ""               ""      ""      ""         "$HANDLE_FILE"
 prepare_test_case basic_header_only BasicHeaderOnly
+generate_interface "--header-only"  ""      ""      ""         "$HANDLE_FILE"
 
 prepare_test_case cow COW
+generate_interface ""               "-cow"  ""      ""         "$HANDLE_FILE"
 prepare_test_case cow_header_only COWHeaderOnly
+generate_interface "--header-only"  "-cow"  ""      ""         "$HANDLE_FILE"
 
 prepare_test_case sbo SBO --sbo
+generate_interface ""               ""      "-sbo"  ""         "$HANDLE_FILE"
 prepare_test_case sbo_header_only SBOHeaderOnly --sbo
+generate_interface "--header-only"  ""      "-sbo"  ""         "$HANDLE_FILE"
 
 prepare_test_case sbo_cow SBO_COW --sbo
+generate_interface ""               "-cow"  "-sbo"  ""         "$HANDLE_FILE"
 prepare_test_case sbo_cow_header_only SBO_COWHeaderOnly --sbo
+generate_interface "--header-only"  "-cow"  "-sbo"  ""         "$HANDLE_FILE"
 
 # vtable-based type-erased interfaces
 prepare_vtable_test_case vtable_basic VTableBasic
+generate_interface ""                ""      ""      "--vtable"  "$DETAIL_FILE"
 prepare_vtable_test_case vtable_basic_header_only VTableBasicHeaderOnly
+generate_interface "--header-only"   ""      ""      "--vtable"  "$DETAIL_FILE"
 
 prepare_vtable_test_case vtable_cow VTableCOW
+generate_interface ""                "-cow"  ""      "--vtable"  "$DETAIL_FILE"
 prepare_vtable_test_case vtable_cow_header_only VTableCOWHeaderOnly
+generate_interface "--header-only"   "-cow"  ""      "--vtable"  "$DETAIL_FILE"
 
 prepare_vtable_test_case vtable_sbo VTableSBO --sbo
+generate_interface ""                ""      "-sbo"  "--vtable"  "$DETAIL_FILE"
 prepare_vtable_test_case vtable_sbo_header_only VTableSBOHeaderOnly --sbo
+generate_interface "--header-only"   ""      "-sbo"  "--vtable"  "$DETAIL_FILE"
 
 prepare_vtable_test_case vtable_sbo_cow VTableSBOCOW --sbo
+generate_interface ""                "-cow"  "-sbo"  "--vtable"  "$DETAIL_FILE"
 prepare_vtable_test_case vtable_sbo_cow_header_only VTableSBOCOWHeaderOnly --sbo
+generate_interface "--header-only"   "-cow"  "-sbo"  "--vtable"  "$DETAIL_FILE"
 
 cd ..
 

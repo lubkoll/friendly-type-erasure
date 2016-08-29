@@ -6,6 +6,7 @@ import file_parser
 import parser_addition
 import to_string
 import util
+import os
 
 
 def add_aliases(data, scope, detail_namespace):
@@ -344,10 +345,10 @@ def get_interface_file_impl(data, scope, interface_scope):
 def get_interface_file(data, interface_scope):
     main_scope = cpp_file_parser.Namespace('global')
     if data.table:
-        main_scope.add(cpp_file_parser.InclusionDirective('"handles/execution_wrapper_for_' + data.interface_file + '"'))
-        main_scope.add(cpp_file_parser.InclusionDirective('"handles/vtable_util.hh"'))
+        main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(data.detail_folder,data.detail_file) + '"'))
+        main_scope.add(cpp_file_parser.InclusionDirective('"' + data.util_include_path + '/vtable_util.hh"'))
     else:
-        main_scope.add(cpp_file_parser.InclusionDirective('"handles/handle_for_' + data.interface_file + '"'))
+        main_scope.add(cpp_file_parser.InclusionDirective('"' + data.detail_folder + '/handle_for_' + data.interface_file + '"'))
     if data.small_buffer_optimization:
         main_scope.add(cpp_file_parser.InclusionDirective('<array>'))
     if not data.copy_on_write:
