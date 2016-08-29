@@ -344,11 +344,12 @@ def get_interface_file_impl(data, scope, interface_scope):
 
 def get_interface_file(data, interface_scope):
     main_scope = cpp_file_parser.Namespace('global')
+    relative_folder = os.path.relpath(data.detail_folder,os.path.dirname(data.interface_file))
     if data.table:
-        main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(data.detail_folder,data.detail_file) + '"'))
+        main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
         main_scope.add(cpp_file_parser.InclusionDirective('"' + data.util_include_path + '/vtable_util.hh"'))
     else:
-        main_scope.add(cpp_file_parser.InclusionDirective('"' + data.detail_folder + '/handle_for_' + data.interface_file + '"'))
+        main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
     if data.small_buffer_optimization:
         main_scope.add(cpp_file_parser.InclusionDirective('<array>'))
     if not data.copy_on_write:
@@ -376,7 +377,7 @@ def write_file(data):
         to_string.write_scope(scope, data.interface_file, to_string.VisitorForHeaderFile())
         source_filename = get_source_filename(data.interface_file)
 
-        scope.content[0] = cpp_file_parser.InclusionDirective('"' + data.interface_file + '"')
+        scope.content[0] = cpp_file_parser.InclusionDirective('"' + data.interface_include_path + '"')
         if not data.copy_on_write:
             scope.content.pop(1)
         to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile())

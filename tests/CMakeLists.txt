@@ -4,7 +4,7 @@ project(type_erasure_test)
 add_definitions(-std=c++11)
 
 find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
+include_directories(. ${GTEST_INCLUDE_DIRS})
 
 aux_source_directory(. SRC_LIST)
 # inheritance-based type erasure

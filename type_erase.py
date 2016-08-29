@@ -48,15 +48,18 @@ def create_parser():
                         help='folder for implementation details')
     parser.add_argument('--util-path', nargs='?', type=str, required=False,
                         default='utils',
-                        help='absolute path for storing utility files')
+                        help='path for storing utility files')
     parser.add_argument('--util-include-path', nargs='?', type=str, required=False,
-                        default='handles',
+                        default='utils',
                         help='relative include path for utility-files')
+    parser.add_argument('--interface-include-path', nargs='?', type=str, required=False,
+                        default='',
+                        help='relative include path for the generated interface')
     return parser
 
 
 class Data:
-    def __init__(self,args):
+    def __init__(self, args):
         self.file = args.file
         self.table = args.table
         self.table = args.vtable
@@ -70,8 +73,12 @@ class Data:
         self.detail_folder = args.detail_folder
         self.detail_extension = args.detail_extension
         self.detail_namespace = args.detail_namespace
-        self.util_path = args.detail_folder
-        self.util_include_path = args.detail_folder
+        self.util_path = args.util_path
+        self.util_include_path = args.util_include_path
+        if args.interface_include_path:
+            self.interface_include_path = args.interface_include_path
+        else:
+            self.interface_include_path = os.path.basename(self.interface_file)
         self.clang_args = args.clang_args
         self.current_namespaces = []
         self.current_struct = clang.cindex.conf.lib.clang_getNullCursor()
@@ -84,11 +91,9 @@ if __name__ == "__main__":
         Config.set_library_path(args.clang_path)
 
     if args.table or args.vtable:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.detail_folder])
-#        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.util_path])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.util_path])
     else:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.detail_folder])
-#        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.util_path])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.util_path])
 
     type_erasure.detail_generator.write_file(Data(args))
     type_erasure.interface_generator.write_file(Data(args))

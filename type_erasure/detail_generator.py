@@ -271,7 +271,7 @@ def get_detail_file(data, interface_scope):
         main_scope.add( cpp_file_parser.InclusionDirective('<type_traits>') )
         main_scope.add( cpp_file_parser.InclusionDirective('<utility>') )
         util_include_dir = data.util_include_path + '/' if data.util_include_path != data.detail_folder else ''
-        main_scope.add( cpp_file_parser.InclusionDirective('"' + util_include_dir + 'util.hh"') )
+        main_scope.add( cpp_file_parser.InclusionDirective('<' + os.path.join(util_include_dir,'util.hh') + '>') )
 
     get_detail_file_impl(data, main_scope, interface_scope)
     return main_scope
