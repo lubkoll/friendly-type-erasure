@@ -371,14 +371,11 @@ def write_file(data):
     scope.visit(cpp_file_parser.SortClass())
     if data.header_only:
         to_string.write_scope(scope, data.interface_file)
-        util.clang_format(data.interface_file)
     else:
         to_string.write_scope(scope, data.interface_file, to_string.VisitorForHeaderFile())
-        util.clang_format(data.interface_file)
         source_filename = get_source_filename(data.interface_file)
 
         scope.content[0] = cpp_file_parser.InclusionDirective('"' + data.interface_file + '"')
         if not data.copy_on_write:
             scope.content.pop(1)
         to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile())
-        util.clang_format(source_filename)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import code
-import clang
 import to_string
 import util
 import file_parser
@@ -283,4 +282,3 @@ def write_file(data):
 
     scope = get_detail_file(data, processor.content)
     to_string.write_scope(scope, data.handle_file)
-    util.clang_format(data.handle_file)

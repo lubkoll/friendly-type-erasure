@@ -1,9 +1,9 @@
 import argparse
 import clang
 from clang.cindex import Config
-import copy
 from subprocess import call
 import os
+import util
 import type_erasure.detail_generator
 import type_erasure.interface_generator
 
@@ -80,7 +80,11 @@ if __name__ == "__main__":
     else:
         call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.handle_folder])
 
-    data = Data(args)
-    type_erasure.detail_generator.write_file(data)
-    data = Data(args)
-    type_erasure.interface_generator.write_file(data)
+    type_erasure.detail_generator.write_file(Data(args))
+    type_erasure.interface_generator.write_file(Data(args))
+
+    # format files
+    util.clang_format(data.handle_file)
+    util.clang_format(data.interface_file)
+    if not data.header_only:
+        util.clang_format(type_erasure.interface_generator.get_source_file(data.interface_file))
