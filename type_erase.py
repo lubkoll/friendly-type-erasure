@@ -3,9 +3,9 @@ import clang
 from clang.cindex import Config
 from subprocess import call
 import os
-import util
 import type_erasure.detail_generator
 import type_erasure.interface_generator
+import type_erasure.util
 
 
 def create_parser():
