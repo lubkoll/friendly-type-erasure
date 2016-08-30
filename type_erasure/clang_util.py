@@ -196,11 +196,15 @@ def get_function_declaration(translation_unit, cursor, class_prefix=''):
 def is_inclusion_directive(kind):
     return kind == CursorKind.INCLUSION_DIRECTIVE
 
+
 def is_class(kind):
     return kind == CursorKind.CLASS_DECL or \
-                    kind == CursorKind.STRUCT_DECL or \
                     kind == CursorKind.CLASS_TEMPLATE or \
                     kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
+
+
+def is_struct(kind):
+    return kind == CursorKind.STRUCT_DECL
 
 
 def is_forward_declaration(translation_unit, cursor):

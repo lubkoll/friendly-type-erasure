@@ -63,24 +63,16 @@ def same_class(entry, classname):
     return entry.type == 'class' and entry.name == classname
 
 
-def is_class(entry):
-    return entry.type == 'class' or entry.type == 'struct'
-
-
-def is_namespace(entry):
-    return entry.type == 'namespace'
-
-
-def is_function(entry):
-    return entry.type == 'function'
-
-
 def get_comment(comments, name):
     if comments is not None:
         for comment in comments:
             if same_signature(name,comment.name):
                 return comment
     return ''
+
+
+def contains_include_for_forward_declaration(comment):
+    return re.match(r'//\s*%\s*([<>"._\\\-a-zA-Z0-9]*)\s*%',comment.comment)
 
 
 def get_return_type(data, classname):

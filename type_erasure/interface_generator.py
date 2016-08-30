@@ -307,10 +307,12 @@ class WrapperFunctionExtractor(HandleFunctionExtractor):
 def add_interface(data, scope, class_scope, detail_namespace):
     impl = code.IMPL if data.table else code.HANDLE
     comments = parser_addition.extract_comments(data.file)
+    for comment in comments:
+        print comment
     comment = util.get_comment(comments, class_scope.get_type() + ' ' + class_scope.get_name())
     if comment:
         scope.add(cpp_file_parser.Comment(comment))
-    if util.is_class(class_scope):
+    if cpp_file_parser.is_class(class_scope):
         scope.add(cpp_file_parser.Class(class_scope.get_name()))
     else:
         scope.add(cpp_file_parser.Struct(class_scope.get_name()))
@@ -332,11 +334,11 @@ def add_interface(data, scope, class_scope, detail_namespace):
 
 def get_interface_file_impl(data, scope, interface_scope):
     for entry in interface_scope.content:
-        if util.is_namespace(entry):
+        if cpp_file_parser.is_namespace(entry):
             scope.add(cpp_file_parser.Namespace(entry.name))
             get_interface_file_impl(data, scope, entry)
             scope.close()
-        elif util.is_class(entry) or util.is_struct(entry):
+        elif cpp_file_parser.is_class(entry) or cpp_file_parser.is_struct(entry):
             add_interface(data, scope, entry, entry.name + data.detail_extension)
         else:
             scope.add(entry)

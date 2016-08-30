@@ -54,12 +54,12 @@ class GenericFileParser(object):
         if len(self.opened) > 0:
             if self.opened[-1] == 'namespace':
                 self.parse_closing_namespaces(parent)
-            if self.opened[-1] == 'class':
+            if self.opened[-1] in ['class','struct']:
                 self.parse_closing_class(parent)
 
 #        print '\nCursor'
-#         print cursor.kind
-#         print cursor.spelling
+#        print cursor.kind
+#        print cursor.spelling
 #         print self.data.current_struct.spelling
 #         tokens = clang_util.get_tokens(self.data.tu, cursor)
 #         for token in tokens:
@@ -87,6 +87,9 @@ class GenericFileParser(object):
         elif clang_util.is_class(cursor.kind):
             self.opened.append('class')
             return self.parse_opening_class(cursor)
+        elif clang_util.is_struct(cursor.kind):
+            self.opened.append('struct')
+            return self.parse_opening_class(cursor)
         elif clang_util.is_function(cursor.kind):
             return self.parse_function(cursor)
         elif clang_util.is_type_alias(kind) or clang_util.is_typedef(kind):
@@ -108,7 +111,7 @@ class GenericFileParser(object):
     def parse_closing_class(self,enclosing_struct):
         while enclosing_struct and \
                         enclosing_struct != self.data.tu.cursor and \
-                not clang_util.is_class(enclosing_struct.kind):
+                not clang_util.is_class(enclosing_struct.kind) and not clang_util.is_struct(enclosing_struct.kind):
             enclosing_struct = enclosing_struct.semantic_parent
 
         if enclosing_struct and \
@@ -135,7 +138,10 @@ class GenericFileParser(object):
         if self.data.current_struct == clang.cindex.conf.lib.clang_getNullCursor():
             self.data.current_struct = cursor
             self.data.current_struct_prefix = clang_util.get_class_prefix(self.data.tu, cursor)
-            self.processor.process_open_class(self.data)
+            if clang_util.is_class(cursor.kind):
+                self.processor.process_open_class(self.data, cursor)
+            else:
+                self.processor.process_open_struct(self.data, cursor)
             return Recurse
         return Continue
 
@@ -162,7 +168,10 @@ class FileProcessor(object):
     def process_close_namespace(self):
         pass
 
-    def process_open_class(self, data):
+    def process_open_class(self, data, cursor):
+        pass
+
+    def process_open_struct(self, data, cursor):
         pass
 
     def process_close_class(self):

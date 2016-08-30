@@ -33,6 +33,50 @@ function prepare_vtable_test_case {
   ../generate_given_interface $2 $GIVEN_INTERFACE
 }
 
+function generate_inheritance_based_type_erasure_tests {
+    prepare_test_case basic Basic
+    generate_interface ""               ""      ""      ""         "$HANDLE_FILE"   basic
+    prepare_test_case basic_header_only BasicHeaderOnly
+    generate_interface "--header-only"  ""      ""      ""         "$HANDLE_FILE"   basic_header_only
+
+    prepare_test_case cow COW
+    generate_interface ""               "-cow"  ""      ""         "$HANDLE_FILE"   cow
+    prepare_test_case cow_header_only COWHeaderOnly
+    generate_interface "--header-only"  "-cow"  ""      ""         "$HANDLE_FILE"   cow_header_only
+
+    prepare_test_case sbo SBO --sbo
+    generate_interface ""               ""      "-sbo"  ""         "$HANDLE_FILE"   sbo
+    prepare_test_case sbo_header_only SBOHeaderOnly --sbo
+    generate_interface "--header-only"  ""      "-sbo"  ""         "$HANDLE_FILE"   sbo_header_only
+
+    prepare_test_case sbo_cow SBO_COW --sbo
+    generate_interface ""               "-cow"  "-sbo"  ""         "$HANDLE_FILE"   sbo_cow
+    prepare_test_case sbo_cow_header_only SBO_COWHeaderOnly --sbo
+    generate_interface "--header-only"  "-cow"  "-sbo"  ""         "$HANDLE_FILE"   sbo_cow_header_only
+}
+
+function generate_vtable_based_type_erasure_tests {
+    prepare_vtable_test_case vtable_basic VTableBasic
+    generate_interface ""                ""      ""      "--vtable"  "$DETAIL_FILE" vtable_basic
+    prepare_vtable_test_case vtable_basic_header_only VTableBasicHeaderOnly
+    generate_interface "--header-only"   ""      ""      "--vtable"  "$DETAIL_FILE" vtable_basic_header_only
+
+    prepare_vtable_test_case vtable_cow VTableCOW
+    generate_interface ""                "-cow"  ""      "--vtable"  "$DETAIL_FILE" vtable_cow
+    prepare_vtable_test_case vtable_cow_header_only VTableCOWHeaderOnly
+    generate_interface "--header-only"   "-cow"  ""      "--vtable"  "$DETAIL_FILE" vtable_cow_header_only
+
+    prepare_vtable_test_case vtable_sbo VTableSBO --sbo
+    generate_interface ""                ""      "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo
+    prepare_vtable_test_case vtable_sbo_header_only VTableSBOHeaderOnly --sbo
+    generate_interface "--header-only"   ""      "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo_header_only
+
+    prepare_vtable_test_case vtable_sbo_cow VTableSBOCOW --sbo
+    generate_interface ""                "-cow"  "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo_cow
+    prepare_vtable_test_case vtable_sbo_cow_header_only VTableSBOCOWHeaderOnly --sbo
+    generate_interface "--header-only"   "-cow"  "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo_cow_header_only
+}
+
 # remove previously generate files
 rm -rf gen/ && mkdir gen
 cp util.hh gen/
@@ -40,47 +84,8 @@ cp mock_fooable.hh gen/
 cd gen
 mkdir $UTIL_PATH
 
-# inheritance-based type-erased interfaces
-prepare_test_case basic Basic
-generate_interface ""               ""      ""      ""         "$HANDLE_FILE"   basic
-prepare_test_case basic_header_only BasicHeaderOnly
-generate_interface "--header-only"  ""      ""      ""         "$HANDLE_FILE"   basic_header_only
-
-prepare_test_case cow COW
-generate_interface ""               "-cow"  ""      ""         "$HANDLE_FILE"   cow
-prepare_test_case cow_header_only COWHeaderOnly
-generate_interface "--header-only"  "-cow"  ""      ""         "$HANDLE_FILE"   cow_header_only
-
-prepare_test_case sbo SBO --sbo
-generate_interface ""               ""      "-sbo"  ""         "$HANDLE_FILE"   sbo
-prepare_test_case sbo_header_only SBOHeaderOnly --sbo
-generate_interface "--header-only"  ""      "-sbo"  ""         "$HANDLE_FILE"   sbo_header_only
-
-prepare_test_case sbo_cow SBO_COW --sbo
-generate_interface ""               "-cow"  "-sbo"  ""         "$HANDLE_FILE"   sbo_cow
-prepare_test_case sbo_cow_header_only SBO_COWHeaderOnly --sbo
-generate_interface "--header-only"  "-cow"  "-sbo"  ""         "$HANDLE_FILE"   sbo_cow_header_only
-
-# vtable-based type-erased interfaces
-prepare_vtable_test_case vtable_basic VTableBasic
-generate_interface ""                ""      ""      "--vtable"  "$DETAIL_FILE" vtable_basic
-prepare_vtable_test_case vtable_basic_header_only VTableBasicHeaderOnly
-generate_interface "--header-only"   ""      ""      "--vtable"  "$DETAIL_FILE" vtable_basic_header_only
-
-prepare_vtable_test_case vtable_cow VTableCOW
-generate_interface ""                "-cow"  ""      "--vtable"  "$DETAIL_FILE" vtable_cow
-prepare_vtable_test_case vtable_cow_header_only VTableCOWHeaderOnly
-generate_interface "--header-only"   "-cow"  ""      "--vtable"  "$DETAIL_FILE" vtable_cow_header_only
-
-prepare_vtable_test_case vtable_sbo VTableSBO --sbo
-generate_interface ""                ""      "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo
-prepare_vtable_test_case vtable_sbo_header_only VTableSBOHeaderOnly --sbo
-generate_interface "--header-only"   ""      "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo_header_only
-
-prepare_vtable_test_case vtable_sbo_cow VTableSBOCOW --sbo
-generate_interface ""                "-cow"  "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo_cow
-prepare_vtable_test_case vtable_sbo_cow_header_only VTableSBOCOWHeaderOnly --sbo
-generate_interface "--header-only"   "-cow"  "-sbo"  "--vtable"  "$DETAIL_FILE" vtable_sbo_cow_header_only
+generate_inheritance_based_type_erasure_tests
+generate_vtable_based_type_erasure_tests
 
 cd ..
 

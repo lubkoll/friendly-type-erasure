@@ -252,11 +252,13 @@ def add_details(data, scope, class_scope):
 
 def get_detail_file_impl(data, scope, interface_scope):
     for entry in interface_scope.content:
-        if util.is_namespace(entry):
+        print "Processing "  + entry.type
+        if cpp_file_parser.is_namespace(entry):
             scope.add( cpp_file_parser.Namespace(entry.name) )
             get_detail_file_impl(data,scope,entry)
             scope.close()
-        elif util.is_class(entry) or util.is_struct(entry):
+        elif cpp_file_parser.is_class(entry) or cpp_file_parser.is_struct(entry):
+            print entry.name
             scope.add(cpp_file_parser.Namespace(entry.name + data.detail_extension))
             add_details(data, scope, entry)
             scope.close()
@@ -281,6 +283,6 @@ def write_file(data):
     processor = cpp_file_parser.CppFileParser()
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
-
+    print processor.content.visit(to_string.Visitor())
     scope = get_detail_file(data, processor.content)
     to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file))

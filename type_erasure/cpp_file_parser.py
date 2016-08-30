@@ -19,6 +19,7 @@ PROTECTED               = 'protected'
 PUBLIC                  = 'public'
 STATIC_VARIABLE         = 'static variable'
 STRUCT                  = 'struct'
+FORWARD_DECLARATION     = 'forward declaration'
 VARIABLE                = 'variable'
 COMMENT                 = 'comment'
 SEPARATOR               = 'separator'
@@ -29,13 +30,20 @@ builtin_float_types     = ['float', 'double', 'long double' ]
 
 
 def is_class(entry):
-    return entry.type == CLASS or entry.type == STRUCT
+    return entry.type == CLASS
+
+
+def is_struct(entry):
+    return entry.type == STRUCT
+
 
 def is_namespace(entry):
     return entry.type == NAMESPACE
 
+
 def is_function(entry):
     return entry.type == FUNCTION
+
 
 def is_access_specifier(entry):
     return entry.type == ACCESS_SPECIFIER
@@ -65,6 +73,11 @@ class Comment(ScopeEntry):
         for line in self.value.comment:
             comment += line + '\n'
         return comment
+
+
+class ForwardDeclaration(ScopeEntry):
+    def __init__(self,forward_declaration):
+        super(ForwardDeclaration,self).__init__(FORWARD_DECLARATION, forward_declaration)
 
 
 class Separator(ScopeEntry):
@@ -110,12 +123,19 @@ class Scope(object):
         self.name = name
         self.content = []
         self.open_sub_scope = None
+        self.current_is_forward_declaration = False
 
     def get_name(self):
         return self.name
 
     def get_type(self):
         return self.type
+
+    def skip(self):
+        if self.current_is_forward_declaration:
+            self.current_is_forward_declaration = False
+            return True
+        return False
 
     def add(self, entry):
         if self.open_sub_scope:
@@ -125,11 +145,16 @@ class Scope(object):
         if entry.type in scoped_types:
             self.open_sub_scope = entry
         else:
+            self.current_is_forward_declaration = entry.type == FORWARD_DECLARATION
             self.content.append( entry )
 
     def close(self):
+        if self.skip():
+            return
         if self.open_sub_scope:
-            if self.open_sub_scope.open_sub_scope is not None:
+            if self.open_sub_scope.skip():
+                return
+            if self.open_sub_scope.open_sub_scope:
                 self.open_sub_scope.close()
             else:
                 self.content.append(self.open_sub_scope)
@@ -449,7 +474,7 @@ class CppFileParser(file_parser.FileProcessor):
         self.content.add( InclusionDirective( clang_util.parse_inclusion_directive(data, cursor) ).replace('#include ', '') )
 
     def process_open_include_guard(self, filename):
-        self.content.add( ScopeEntry( 'include_guard', extract_include_guard(filename)) )
+        self.content.add( ScopeEntry( 'include_guard', parser_addition.extract_include_guard(filename)) )
 
     def process_headers(self, headers):
         self.content.add( ScopeEntry( 'headers', headers ) )
@@ -460,8 +485,17 @@ class CppFileParser(file_parser.FileProcessor):
     def process_close_namespace(self):
         self.content.close()
 
-    def process_open_class(self, data):
-        self.content.add( Class(data.current_struct.spelling) )
+    def process_open_class(self, data, cursor):
+        if clang_util.get_tokens(data.tu, cursor)[2].spelling == clang_util.semicolon:
+            self.content.add( ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu,cursor)[:3], ' ')) )
+        else:
+            self.content.add( Class(data.current_struct.spelling) )
+
+    def process_open_struct(self, data, cursor):
+        if clang_util.get_tokens(data.tu, cursor)[2].spelling == clang_util.semicolon:
+            self.content.add( ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu,cursor)[:3], ' ')) )
+        else:
+            self.content.add( Struct(data.current_struct.spelling) )
 
     def process_close_class(self):
         self.content.close()
@@ -480,7 +514,6 @@ class CppFileParser(file_parser.FileProcessor):
 
     def process_type_alias(self,data,cursor):
         self.content.add(Alias(cursor.spelling, clang_util.get_tokens(data.tu,cursor)))
-        #self.content.add( Alias( clang_util.get_type_alias_or_typedef(data.tu, cursor) ) )
 
     def process_variable_declaration(self,data,cursor):
         variable_declaration = clang_util.get_variable_declaration(data.tu, cursor)
