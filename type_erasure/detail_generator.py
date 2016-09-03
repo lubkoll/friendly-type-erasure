@@ -5,6 +5,7 @@ import to_string
 import util
 import file_parser
 import cpp_file_parser
+import parser_addition
 import os
 
 
@@ -28,12 +29,12 @@ class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
 
 
 def add_pure_virtual_clone_function(data, scope, classname):
-    clone = 'virtual ' + util.get_return_type(data, classname) + 'clone ( ) const = 0 ;'
+    clone = 'virtual ' + code.get_return_type(data, classname) + 'clone ( ) const = 0 ;'
     scope.add( cpp_file_parser.get_function_from_text(classname, 'clone', 'return ', clone) )
 
 
 def add_pure_virtual_functions_for_small_buffer_optimization(data, scope, classname):
-    clone_into = 'virtual ' + util.get_return_type(data, classname) + 'clone_into ( Buffer & ) const = 0 ;'
+    clone_into = 'virtual ' + code.get_return_type(data, classname) + 'clone_into ( Buffer & ) const = 0 ;'
     scope.add(cpp_file_parser.get_function_from_text(classname, 'clone_into', 'return ', clone_into))
     if not data.copy_on_write:
         destroy = 'virtual void destroy ( ) noexcept = 0 ;'
@@ -94,8 +95,8 @@ def add_overriding_functions(data, scope, classname):
                       'else this -> ~ ' + classname + ' ( ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, 'destroy', '', destroy))
     else:
-        clone = util.get_return_type(data, classname) + 'clone ( ) const override { ' \
-                'return ' + util.get_generator(data, classname) + '( value_ ) ; }'
+        clone = code.get_return_type(data, classname) + 'clone ( ) const override { ' \
+                'return ' + code.get_generator(data, classname) + '( value_ ) ; }'
         scope.add(cpp_file_parser.get_function_from_text(classname, 'clone', 'return ', clone))
 
 
@@ -252,13 +253,11 @@ def add_details(data, scope, class_scope):
 
 def get_detail_file_impl(data, scope, interface_scope):
     for entry in interface_scope.content:
-        print "Processing "  + entry.type
         if cpp_file_parser.is_namespace(entry):
             scope.add( cpp_file_parser.Namespace(entry.name) )
             get_detail_file_impl(data,scope,entry)
             scope.close()
         elif cpp_file_parser.is_class(entry) or cpp_file_parser.is_struct(entry):
-            print entry.name
             scope.add(cpp_file_parser.Namespace(entry.name + data.detail_extension))
             add_details(data, scope, entry)
             scope.close()
@@ -275,6 +274,11 @@ def get_detail_file(data, interface_scope):
         util_include_dir = data.util_include_path + '/' if data.util_include_path != data.detail_folder else ''
         main_scope.add( cpp_file_parser.InclusionDirective('<' + os.path.join(util_include_dir,'util.hh') + '>') )
 
+    comments = parser_addition.extract_comments(data.file)
+    inclusion_directives_for_forward_decl = util.get_inclusion_directives_for_forward_declarations(data, comments)
+    for inclusion_directive in inclusion_directives_for_forward_decl:
+        main_scope.add(cpp_file_parser.InclusionDirective(inclusion_directive))
+
     get_detail_file_impl(data, main_scope, interface_scope)
     return main_scope
 
@@ -283,6 +287,5 @@ def write_file(data):
     processor = cpp_file_parser.CppFileParser()
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
-    print processor.content.visit(to_string.Visitor())
     scope = get_detail_file(data, processor.content)
     to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file))

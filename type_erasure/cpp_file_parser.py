@@ -79,6 +79,9 @@ class ForwardDeclaration(ScopeEntry):
     def __init__(self,forward_declaration):
         super(ForwardDeclaration,self).__init__(FORWARD_DECLARATION, forward_declaration)
 
+    def visit(self,visitor):
+        return visitor.visit_forward_declaration(self)
+
 
 class Separator(ScopeEntry):
     def __init__(self):
@@ -562,6 +565,9 @@ class Visitor(object):
 
     def visit_class(self,class_):
         return self.visit(class_)
+
+    def visit_forward_declaration(self,forward_declaration):
+        return self.visit(forward_declaration)
 
     def visit_template_class(self,template_class):
         return self.visit(template_class)

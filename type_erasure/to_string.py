@@ -10,14 +10,14 @@ class Visitor(cpp_file_parser.Visitor):
         str = class_.type + ' ' + class_.name + '{\n'
         for entry in class_.content:
             str += entry.visit(self)
-        str += '};\n'
+        str += '};\n\n'
         return str
 
     def visit_template_class(self,template_class):
         code = util.concat(template_class.tokens,' ') + '{\n'
         for entry in template_class.content:
             code += entry.visit(self)
-        return code + '};\n'
+        return code + '};\n\n'
 
     def visit_namespace(self,namespace):
         str = ''
@@ -61,7 +61,7 @@ class VisitorForHeaderFile(Visitor):
         code += '\n{\n'
         for entry in class_object.content:
             code += entry.visit(self)
-        code += '};\n'
+        code += '};\n\n'
         return code
 
     def visit_namespace(self, namespace):
@@ -107,6 +107,9 @@ class VisitorForSourceFile(Visitor):
         self.remove_class_prefix_for_nested_types(function)
 
         return definition
+
+    def visit_forward_declaration(self,forward_declaration):
+        return ''
 
     def visit_template_function(self,function):
         return ''

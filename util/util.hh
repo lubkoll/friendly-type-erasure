@@ -49,7 +49,8 @@ namespace type_erasure_detail
     {
         if ( sizeof( StackAllocatedHandle ) <= sizeof( Buffer ) ) {
             new (&buffer) StackAllocatedHandle( std::forward<T>(value) );
-            return std::shared_ptr<StackAllocatedHandle>( std::shared_ptr<StackAllocatedHandle>(), static_cast<StackAllocatedHandle*>( static_cast<void*>(&buffer) ) );
+            return std::shared_ptr<StackAllocatedHandle>( std::shared_ptr<StackAllocatedHandle>(),
+                                                          static_cast<StackAllocatedHandle*>( static_cast<void*>(&buffer) ) );
         }
 
         return std::make_shared<HeapAllocatedHandle>( std::forward<T>(value) );

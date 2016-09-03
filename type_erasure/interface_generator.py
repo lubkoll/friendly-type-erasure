@@ -307,8 +307,6 @@ class WrapperFunctionExtractor(HandleFunctionExtractor):
 def add_interface(data, scope, class_scope, detail_namespace):
     impl = code.IMPL if data.table else code.HANDLE
     comments = parser_addition.extract_comments(data.file)
-    for comment in comments:
-        print comment
     comment = util.get_comment(comments, class_scope.get_type() + ' ' + class_scope.get_name())
     if comment:
         scope.add(cpp_file_parser.Comment(comment))
@@ -344,24 +342,27 @@ def get_interface_file_impl(data, scope, interface_scope):
             scope.add(entry)
 
 
-def get_interface_file(data, interface_scope):
+def get_interface_file(data, interface_scope, for_header_file=True):
     main_scope = cpp_file_parser.Namespace('global')
     relative_folder = os.path.relpath(data.detail_folder,os.path.dirname(data.interface_file))
-    if data.table:
-        main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
-        main_scope.add(cpp_file_parser.InclusionDirective('"' + data.util_include_path + '/vtable_util.hh"'))
+    if for_header_file:
+        if data.table:
+            main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
+            main_scope.add(cpp_file_parser.InclusionDirective('"' + data.util_include_path + '/vtable_util.hh"'))
+        else:
+            main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
+        if data.small_buffer_optimization:
+            main_scope.add(cpp_file_parser.InclusionDirective('<array>'))
+        if not data.copy_on_write:
+            main_scope.add(cpp_file_parser.InclusionDirective('<memory>'))
     else:
-        main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
-    if data.small_buffer_optimization:
-        main_scope.add(cpp_file_parser.InclusionDirective('<array>'))
-    if not data.copy_on_write:
-        main_scope.add(cpp_file_parser.InclusionDirective('<memory>'))
+        main_scope.add(cpp_file_parser.InclusionDirective('"' + data.interface_include_path + '"'))
     get_interface_file_impl(data, main_scope, interface_scope)
     return main_scope
 
 
 def get_source_filename(header_filename):
-    for ending in ['.hh','.h','.hpp']:
+    for ending in ['.hh', '.h', '.hpp']:
         header_filename = header_filename.replace(ending,'.cpp')
     return header_filename
 
@@ -379,7 +380,6 @@ def write_file(data):
         to_string.write_scope(scope, data.interface_file, to_string.VisitorForHeaderFile())
         source_filename = get_source_filename(data.interface_file)
 
-        scope.content[0] = cpp_file_parser.InclusionDirective('"' + data.interface_include_path + '"')
-        if not data.copy_on_write:
-            scope.content.pop(1)
+        scope = get_interface_file(data, processor.content, for_header_file=False)
+        scope.visit(cpp_file_parser.SortClass())
         to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile())

@@ -50,13 +50,9 @@ def concat(tokens,spacing=''):
 
 
 def clang_format(filename):
-    pass
-#    call(["clang-format-3.8", '-i', filename])
-
-
-def indent_lines(lines, data, indent):
-    regex = re.compile(r'\n')
-    return regex.sub('\n' + indent, indent + lines)
+    formatter_file = os.path.join(os.path.dirname(__file__), 'formatting.txt')
+    line = trim(open(formatter_file, 'r').readline().replace('filename', filename))
+    call(line.split(' '))
 
 
 def same_class(entry, classname):
@@ -72,18 +68,13 @@ def get_comment(comments, name):
 
 
 def contains_include_for_forward_declaration(comment):
-    return re.match(r'//\s*%\s*([<>"._\\\-a-zA-Z0-9]*)\s*%',comment.comment)
+    return re.match(r'//\s*%\s*([<>"._\\\-a-zA-Z0-9]*)\s*%',comment.comment[0])
 
 
-def get_return_type(data, classname):
-    if data.copy_on_write:
-        return 'std :: shared_ptr < HandleBase > '
-    else:
-        return classname + ' * '
-
-
-def get_generator(data, classname):
-    if data.copy_on_write:
-        return 'std :: make_shared < typename std :: decay < ' + classname + ' > :: type >'
-    else:
-        return 'new typename std :: decay < ' + classname + ' > :: type'
+def get_inclusion_directives_for_forward_declarations(data, comments):
+    inclusion_directives_for_forward_decl = []
+    for comment in comments:
+        match = contains_include_for_forward_declaration(comment)
+        if match:
+            inclusion_directives_for_forward_decl.append(match.group(1))
+    return inclusion_directives_for_forward_decl

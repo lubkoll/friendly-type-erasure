@@ -12,6 +12,20 @@ def get_decayed(type_):
     return 'typename std :: decay < ' + type_ + ' > :: type'
 
 
+def get_return_type(data, classname):
+    if data.copy_on_write:
+        return 'std :: shared_ptr < HandleBase > '
+    else:
+        return classname + ' * '
+
+
+def get_generator(data, classname):
+    if data.copy_on_write:
+        return 'std :: make_shared < typename std :: decay < ' + classname + ' > :: type >'
+    else:
+        return 'new typename std :: decay < ' + classname + ' > :: type'
+
+
 static_reference_check = 'typename std :: enable_if < std :: is_same < typename std :: remove_const < T > :: type , ' + \
                          get_decayed('U') + ' & > :: value > :: type * = nullptr '
 
@@ -47,7 +61,7 @@ def get_handle_constructor(data, classname, handle_namespace):
         constructor += '{ ' + get_handle_constructor_body_for_small_buffer_optimization(clone_into) + '}'
     else:
         constructor += ': ' + HANDLE + ' ( ' + \
-                       util.get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' > ') + ' '
+                       get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' > ') + ' '
         constructor += '( std :: forward < T > ( value ) ) ) { }'
     return constructor
 
@@ -69,7 +83,7 @@ def get_assignment_from_value(data, classname, handle_namespace):
             code += HANDLE + ' = '
         else:
             code += '' + HANDLE + ' . reset ( '
-        code += util.get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' >  ')
+        code += get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' >  ')
         code += ' ( std :: forward < T > ( value ) ) '
         if not data.copy_on_write:
             code += ') '

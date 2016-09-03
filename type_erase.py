@@ -91,15 +91,18 @@ if __name__ == "__main__":
         Config.set_library_path(args.clang_path)
 
     if args.table or args.vtable:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'vtable_util.hh'), args.util_path])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'util', 'vtable_util.hh'), args.util_path])
     else:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'forms', 'util.hh'), args.util_path])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'util', 'util.hh'), args.util_path])
 
     type_erasure.detail_generator.write_file(Data(args))
     type_erasure.interface_generator.write_file(Data(args))
 
     # format files
-    type_erasure.util.clang_format(args.detail_file)
-    type_erasure.util.clang_format(args.interface_file)
+    abs_path = os.path.join(os.getcwd(), args.detail_folder, args.detail_file)
+    type_erasure.util.clang_format(abs_path)
+    abs_path = os.path.join(os.getcwd(), args.interface_file)
+    type_erasure.util.clang_format(abs_path)
     if not args.header_only:
-        type_erasure.util.clang_format(type_erasure.interface_generator.get_source_filename(args.interface_file))
+        abs_path = os.path.join(os.getcwd(), type_erasure.interface_generator.get_source_filename(args.interface_file))
+        type_erasure.util.clang_format(abs_path)
