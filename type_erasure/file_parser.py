@@ -28,7 +28,9 @@ class GenericFileParser(object):
         if self.data.current_struct != clang.cindex.conf.lib.clang_getNullCursor():
             self.processor.process_close_class()
 
-        util.close_namespaces(self.processor, self.data)
+        while len(self.data.current_namespaces):
+            self.data.current_namespaces.pop()
+            self.processor.process_close_namespace()
 
     def visit(self, cursor):
         for child in cursor.get_children():
@@ -60,6 +62,7 @@ class GenericFileParser(object):
 #        print '\nCursor'
 #        print cursor.kind
 #        print cursor.spelling
+#        print util.concat(clang_util.get_tokens(self.data.tu, cursor),' ')
 #         print self.data.current_struct.spelling
 #         tokens = clang_util.get_tokens(self.data.tu, cursor)
 #         for token in tokens:
@@ -129,7 +132,7 @@ class GenericFileParser(object):
 
     def parse_opening_namespace(self,cursor):
         if clang.cindex.conf.lib.clang_Location_isFromMainFile(cursor.location):
-            self.processor.process_open_namespace(cursor.spelling)
+            self.processor.process_open_namespace(self.data, cursor)
             self.data.current_namespaces.append(cursor)
             return Recurse
         return Continue
@@ -162,7 +165,7 @@ class FileProcessor(object):
     def process_headers(self, headers):
         pass
 
-    def process_open_namespace(self, namespace_name):
+    def process_open_namespace(self, data, cursor):
         pass
 
     def process_close_namespace(self):

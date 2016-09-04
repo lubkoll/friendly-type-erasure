@@ -1,0 +1,92 @@
+#include <gtest/gtest.h>
+
+#include "interface.hh"
+#include "../../../mock_fooable.hh"
+
+namespace
+{
+    using %class_name% = %namespace_name%::%class_name%;
+    using Mock::Mock%class_name%;
+
+    void death_tests( %class_name%& fooable )
+    {
+#ifndef NDEBUG
+        EXPECT_DEATH( fooable.foo(), "" );
+        EXPECT_DEATH( fooable.set_value( Mock::other_value ), "" );
+#endif
+    }
+
+    void test_interface( %class_name%& fooable, int initial_value, int new_value )
+    {
+        EXPECT_EQ( fooable.foo(), initial_value );
+        fooable.set_value( new_value );
+        EXPECT_EQ( fooable.foo(), new_value );
+    }
+    void test_copies( %class_name%& copy, const %class_name%& fooable, int new_value )
+    {
+        auto value = fooable.foo();
+        test_interface( copy, value, new_value );
+        EXPECT_EQ( fooable.foo(), value );
+        ASSERT_NE( value, new_value );
+        EXPECT_NE( fooable.foo(), copy.foo() );
+    }
+}
+
+TEST( TEST%namespace_name%%class_name%, DefaultConstruction )
+{
+    %class_name% fooable;
+    test_interface(fooable, %class_name%::static_value, 73);
+}
+/*
+TEST( Test%namespace_name%%class_name%, Empty )
+{
+    %class_name% fooable;
+    death_tests(fooable);
+
+    %class_name% copy(fooable);
+    death_tests(copy);
+
+    %class_name% move( std::move(fooable) );
+    death_tests(move);
+
+    %class_name% copy_assign;
+    copy_assign = move;
+    death_tests(copy_assign);
+
+    %class_name% move_assign;
+    move_assign = std::move(copy_assign);
+    death_tests(move_assign);
+}
+
+TEST( Test%namespace_name%%class_name%, OperatorBool )
+{
+    %class_name% fooable;
+    bool valid( fooable );
+    EXPECT_FALSE( valid );
+    fooable = Mock%class_name%();
+    valid = bool( fooable );
+    EXPECT_TRUE( valid );
+    fooable = %class_name%();
+    valid = bool( fooable );
+    EXPECT_FALSE( valid );
+}
+*/
+
+TEST( Test%namespace_name%%class_name%, NestedTypeAlias )
+{
+    const auto expected_nested_type_alias = std::is_same<%class_name%::type, int>::value;
+    EXPECT_TRUE( expected_nested_type_alias );
+}
+
+TEST( Test%namespace_name%%class_name%, NestedType )
+{
+    const auto expected_nested_type = std::is_same<%class_name%::void_type, void>::value;
+    EXPECT_TRUE( expected_nested_type );
+}
+
+TEST( Test%namespace_name%%class_name%, StaticConstMemberVariable )
+{
+    const auto static_value = %class_name%::static_value;
+    EXPECT_EQ( 1, static_value );
+}
+

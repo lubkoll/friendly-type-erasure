@@ -1,9 +1,5 @@
-import clang
 import re
-
 from clang.cindex import CursorKind
-from clang.cindex import TypeKind
-import os
 from util import trim
 
 
@@ -16,6 +12,7 @@ close_brace = '}'
 open_bracket = '<'
 close_bracket = '>'
 comma = ','
+brackets = [open_paren, close_paren, open_brace, close_brace]
 
 
 def get_tokens(tu, cursor):
@@ -218,8 +215,10 @@ def is_namespace(kind):
 
 
 def is_function(kind):
-    return kind == CursorKind.CXX_METHOD or \
-                    kind == CursorKind.CONVERSION_FUNCTION
+    return kind in [CursorKind.CXX_METHOD,
+                    CursorKind.FUNCTION_DECL,
+                    CursorKind.CONVERSION_FUNCTION]
+
 
 def is_template(kind):
     return kind == CursorKind.CLASS_TEMPLATE or \
@@ -293,7 +292,21 @@ def make_type(spellings):
 
 def parse_inclusion_directive(data,cursor):
     tokens = get_tokens(data.tu, cursor)
-    return tokens[0].spelling + tokens[1].spelling + ' ' + tokens[2].spelling + '\n'
+
+    directive = tokens[0].spelling + tokens[1].spelling + ' '
+
+    spelling = tokens[2].spelling
+    if (spelling.startswith('"') and spelling.endswith('"')) or (spelling.startswith('<') and spelling.endswith('>')):
+        return directive + spelling
+
+    closing = '"'
+    if tokens[2].spelling == '<':
+        closing = '>'
+    for i in range(2,len(tokens)):
+        spelling = tokens[i].spelling
+        directive += spelling
+        if spelling == closing:
+            return directive + '\n'
 
 
 my_identifier_regex = re.compile(r'[_a-zA-Z][_a-zA-Z0-9]*')
@@ -328,3 +341,107 @@ def read_function_specifiers(function,tokens,index):
                 function.is_deleted = True
             last_was_equals = False
         index += 1
+
+
+def same_tokens(tokens, other_tokens):
+    if len(tokens) != len(other_tokens):
+        return False
+    for i in range(len(tokens)):
+        if tokens[i].spelling != other_tokens[i].spelling:
+            return False
+    return True
+
+
+class ScopeMonitor(object):
+    def __init__(self, open_parens = 0, open_brackets = 0, open_braces = 0):
+        self.initial_open_parens = open_parens
+        self.open_parens = self.initial_open_parens
+        self.initial_open_brackets = open_brackets
+        self.open_brackets = self.initial_open_brackets
+        self.initial_open_braces = open_braces
+        self.open_braces = self.initial_open_braces
+        self.opened_scope = False
+
+    def process(self,spelling):
+        if spelling == open_paren:
+            self.opened_scope = True
+            self.open_parens += 1
+        if spelling == close_paren:
+            self.open_parens -= 1
+        if spelling == open_bracket:
+            self.opened_scope = True
+            self.open_brackets += 1
+        if spelling == close_bracket:
+            self.open_brackets -= 1
+        if spelling == open_brace:
+            self.opened_scope = True
+            self.open_braces += 1
+        if spelling == close_brace:
+            self.open_braces -= 1
+
+    def before_scope(self):
+        return not self.opened_scope
+
+    def all_closed(self):
+        return self.open_parens == self.initial_open_parens and \
+               self.open_brackets == self.initial_open_brackets and \
+               self.open_braces == self.initial_open_braces
+
+
+def get_end_of_member_initialization(index,tokens):
+    while tokens[index].spelling in [':', ',']:
+        index += 1
+        while tokens[index].spelling not in [open_paren, open_brace]:
+            index += 1
+        counter = ScopeMonitor()
+        counter.process(tokens[index].spelling)
+        while not counter.all_closed():
+            index += 1
+            counter.process(tokens[index].spelling)
+    return index
+
+
+def get_all_variable_tokens(decl_tokens, tokens):
+    if len(decl_tokens) >= len(tokens):
+        return decl_tokens
+
+    index = -1
+    for i in range(len(tokens) - len(decl_tokens)):
+        if same_tokens(decl_tokens, tokens[i:len(decl_tokens) + i]):
+            index = i
+            break
+    if index == -1:
+        return decl_tokens
+
+    for i in range(index+len(decl_tokens),len(tokens)):
+        decl_tokens.append(tokens[i])
+        if tokens[i].spelling == semicolon:
+            return decl_tokens
+
+
+def get_all_tokens(decl_tokens, tokens):
+    if len(decl_tokens) >= len(tokens) or decl_tokens[-1].spelling == close_brace:
+        return decl_tokens
+
+    index = -1
+    for i in range(len(tokens) - len(decl_tokens)):
+        if same_tokens(decl_tokens, tokens[i:len(decl_tokens)+i]):
+            index = i
+            break
+    if index == -1:
+        return decl_tokens
+
+    end_index = get_end_of_member_initialization(index+len(decl_tokens), tokens)
+    decl_tokens.extend(tokens[index+len(decl_tokens):end_index])
+
+    index = end_index
+    while tokens[index].spelling != open_brace:
+        decl_tokens.append(tokens[index])
+        index += 1
+
+    monitor = ScopeMonitor()
+    for i in range(index, len(tokens)):
+        monitor.process(tokens[i].spelling)
+        decl_tokens.append(tokens[i])
+        if not monitor.before_scope() and monitor.all_closed():
+            return decl_tokens

@@ -3,6 +3,7 @@ import parser_addition
 import util
 
 
+FUNCTION_TABLE_TYPE = 'FunctionTable'
 FUNCTION_TABLE = 'function_table'
 IMPL           = 'impl'
 HANDLE         = 'handle_'
@@ -118,11 +119,42 @@ def get_copy_constructor_for_table(data, classname, impl=IMPL, function_table=FU
         return declaration + ': nullptr ) { }'
 
 
-def get_copy_constructor_for_handle(data, classname, handle=HANDLE):
+def get_copy_constructor_for_handle(data, classname, member):
     declaration = classname + ' ( const ' + classname + ' & other ) '
     if data.small_buffer_optimization:
         return declaration + '{ ' + handle_copy_assignment_for_small_buffer_optimization + '}'
-    return declaration + ': ' + handle + ' ( other . ' + handle + ' ? other . ' + handle + ' -> clone ( ) : nullptr ) { }'
+    return declaration + ': ' + member + ' ( other . ' + member + ' ? other . ' + member + ' -> clone ( ) : nullptr ) { }'
+
+
+def get_pimpl_copy_constructor(data, classname, private_classname, member):
+    declaration = classname + ' ( const ' + classname + ' & other ) '
+    if data.small_buffer_optimization:
+        return declaration + '{ ' + handle_copy_assignment_for_small_buffer_optimization + '}'
+    return declaration + ': ' + member + ' ( other . ' + member + ' ? new ' + private_classname + ' ( * other . pimpl_ ) : ' \
+                                                                                                  'nullptr ) { }'
+
+
+def get_pimpl_move_constructor(data, classname, member):
+    declaration = classname + ' ( ' + classname + ' && other ) '
+    if data.small_buffer_optimization:
+        return declaration + '{ ' + handle_copy_assignment_for_small_buffer_optimization + '}'
+    return declaration + ': ' + member + ' ( std::move( other ) . ' + member + ' ) { }'
+
+
+def get_pimpl_copy_assignment(data, classname, private_classname, member):
+    declaration = classname + ' & ' + 'operator = ( const ' + classname + ' & other ) { '
+    if data.small_buffer_optimization:
+        declaration += handle_copy_assignment_for_small_buffer_optimization
+    declaration += 'if ( other . ' + member + ' ) '
+    return declaration + member + ' . reset ( new ' + private_classname + '( * other . pimpl_ ) ) ; ' \
+                                                                          'else pimpl_ = nullptr ; return * this ; }'
+
+
+def get_pimpl_move_assignment(data, classname, member):
+    declaration = classname + ' & ' + 'operator = ( ' + classname + ' && other ) { '
+    if data.small_buffer_optimization:
+        declaration += handle_copy_assignment_for_small_buffer_optimization
+    return declaration + member + ' = std::move( other ) . ' + member + ' ; return * this ; }'
 
 
 def get_copy_constructor(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
@@ -132,7 +164,7 @@ def get_copy_constructor(data, classname, impl=IMPL, function_table=FUNCTION_TAB
 
 def get_move_constructor_for_table(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
     declaration = classname + ' ( ' + classname + ' && other ) noexcept : '
-    declaration += function_table + '( other . ' + function_table + ' ) '
+    declaration += function_table + ' ( other . ' + function_table + ' ) '
     if data.small_buffer_optimization:
         if data.copy_on_write:
             declaration += '{ if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + impl + ' . get ( ) , '
@@ -331,3 +363,7 @@ def get_write_function_for_table(data, return_type, member, function_table):
 def get_write_function(data, return_type, member, function_table=FUNCTION_TABLE):
     return get_write_function_for_table(data, return_type, member, function_table) if data.table \
         else get_write_function_for_handle(data, return_type, member)
+
+
+def get_single_function_call(function):
+    return function.name + ' ( ' + cpp_file_parser.get_function_arguments_in_single_call(function) + ' ) '

@@ -1,6 +1,6 @@
 import copy
 import re
-from util import trim, ltrim
+from type_erasure.util import trim, ltrim
 
 class Comment:
     def __init__(self, comment=[], name=""):
@@ -10,7 +10,7 @@ class Comment:
     def __str__(self):
         result = "Name:\n"  + self.name + "\n"
         result += "Comment:\n"
-	for line in self.comment:
+        for line in self.comment:
             result += line
         return result
 
@@ -44,9 +44,29 @@ def is_template(line):
 
 
 def skip_empty_lines(file,line):
-    while( trim(line) == "" ):
+    while trim(line) == '':
         line = file.readline()
     return line
+
+
+def extract_include_guard(filename):
+    # detect classical include guard
+    archetypes = open(filename).read()
+    guard_regex = re.compile(r'#ifndef\s+([^\s]+)[^\n]*\n#define\s+\1')
+    match = guard_regex.search(archetypes)
+    if match and match.start() == archetypes.index('#'):
+        return '''#ifndef {0}
+#define {0}
+
+'''.format(match.group(1))
+
+    # detect pragma once include guard
+    guard_regex = re.compile(r'#pragma\s+once\s+')
+    match = guard_regex.search(archetypes)
+    if match and match.start() == archetypes.index('#'):
+        return '#pragma once\n'
+
+    return None
 
 
 def read_template_definition(file, line):

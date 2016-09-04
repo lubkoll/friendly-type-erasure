@@ -76,6 +76,15 @@ class VisitorForHeaderFile(Visitor):
             code += '}\n'
         return code
 
+    def visit_comment(self,comment):
+        first_line = comment.value.comment[0]
+        if first_line.startswith('//') and not first_line.startswith('///') and not first_line.startswith('//!'):
+            return ''
+        else:
+            return super(VisitorForHeaderFile,self).visit_comment(comment)
+
+
+
 
 class VisitorForSourceFile(Visitor):
     def __init__(self):
@@ -147,7 +156,9 @@ class VisitorForSourceFile(Visitor):
         return ''
 
 
-def write_scope(scope, filename, visitor=Visitor()):
+def write_scope(scope, filename, visitor=Visitor(), write_warning_header=True):
     file = open(filename,'w')
+    if write_warning_header:
+        file.write(util.do_not_overwrite_text)
     file.write(scope.visit(visitor))
     file.close()

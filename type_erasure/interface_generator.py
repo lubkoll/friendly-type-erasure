@@ -118,7 +118,7 @@ def add_default_interface(data, scope, class_scope, detail_namespace):
                                                                      destructor, 'destructor'))
 
     add_operators(data, scope, classname, detail_namespace)
-    add_casts(data, scope, classname, detail_namespace)
+#    add_casts(data, scope, classname, detail_namespace)
 
 
 def add_private_section(data, scope, detail_namespace, classname, impl, function_table=code.FUNCTION_TABLE):
@@ -139,9 +139,9 @@ def add_private_section(data, scope, detail_namespace, classname, impl, function
 
     if data.table:
         if data.small_buffer_optimization:
-            scope.add(cpp_file_parser.Variable(detail_namespace + '::function_table<Buffer>' + function_table + ';'))
+            scope.add(cpp_file_parser.Variable(detail_namespace + '::' + code.FUNCTION_TABLE_TYPE + '<Buffer>' + function_table + ';'))
         else:
-            scope.add(cpp_file_parser.Variable(detail_namespace + '::function_table ' + function_table + ';'))
+            scope.add(cpp_file_parser.Variable(detail_namespace + '::' + code.FUNCTION_TABLE_TYPE + ' ' + function_table + ';'))
         if data.copy_on_write:
             scope.add(cpp_file_parser.Variable('std::shared_ptr<void> ' + impl + ' = nullptr;'))
         else:
@@ -176,16 +176,10 @@ def add_private_section(data, scope, detail_namespace, classname, impl, function
 
 
 class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
-    def __init__(self, scope, copy_on_write, comments=None):
+    def __init__(self, scope, copy_on_write):
         self.scope = scope
         self.in_private_section = True
         self.copy_on_write = copy_on_write
-        self.comments = comments
-
-    def add_comment(self,name):
-        comment = util.get_comment(self.comments, name)
-        if comment:
-            self.scope.add(cpp_file_parser.Comment(comment))
 
     def visit_access_specifier(self, access_specifier):
         self.in_private_section = access_specifier.value == cpp_file_parser.PRIVATE
@@ -195,7 +189,6 @@ class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
     def visit_alias(self, alias):
         if self.in_private_section:
             return
-        self.add_comment(util.concat(alias.tokens, ' '))
         self.scope.add(alias)
 
     def visit(self,entry):
@@ -205,7 +198,6 @@ class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
 
     def visit_class(self,class_):
         self.in_private_section = class_.type == cpp_file_parser.CLASS
-        self.add_comment(class_.type + ' ' + class_.name)
         super(HandleFunctionExtractor,self).visit_class(class_)
 
     def visit_function(self,function):
@@ -224,7 +216,6 @@ class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
             code += 'handle_ -> '
         code += function.name + ' ( ' + cpp_file_parser.get_function_arguments_in_single_call(function) + ' ) ; }'
 
-        self.add_comment(function.get_declaration())
         self.scope.add(cpp_file_parser.get_function_from_text(function.classname, function.name, function.return_str, code))
 
 
@@ -249,7 +240,7 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
             constructor_end += '{ new ( & buffer_ ) ' + code.get_decayed('T') + ' ( std :: forward < T > ( value ) ) ; '
             if data.copy_on_write:
                 constructor_end += 'impl = std :: shared_ptr < ' + code.get_decayed('T') + ' > ( '
-                constructor_end += 'std :: shared_ptr < ' + code.get_decayed('T') + ' >  ( nullptr ) , '
+                constructor_end += 'std :: shared_ptr < ' + code.get_decayed('T') + ' >  ( ) , '
                 constructor_end += 'static_cast < ' + code.get_decayed('T') + ' * > ( static_cast < void * > ( & buffer_ ) ) ) ; } '
                 constructor_end += 'else impl = std :: make_shared < ' + code.get_decayed('T') + ' > '
                 constructor_end += '( std :: forward < T > ( value ) ) ; '
@@ -272,16 +263,16 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
 
     def visit_function(self,function):
         self.constructor += ' , & ' + self.detail_namespace + ' :: execution_wrapper < ' + code.get_decayed('T') + ' > '
-        self.constructor += ' :: ' + function.name
+        self.constructor += ' :: ' + util.get_name_for_variable(function.name)
 
 
 class WrapperFunctionExtractor(HandleFunctionExtractor):
-    def __init__(self, classname, scope, comments=None, member=code.IMPL, const_member=code.IMPL, function_table=code.FUNCTION_TABLE):
+    def __init__(self, classname, scope, member=code.IMPL, const_member=code.IMPL, function_table=code.FUNCTION_TABLE):
         self.classname = classname
         self.member = member
         self.const_member = const_member
         self.function_table = function_table
-        super(WrapperFunctionExtractor,self).__init__(scope, False, comments)
+        super(WrapperFunctionExtractor,self).__init__(scope, False)
 
     def visit_function(self,function):
         member = self.const_member if cpp_file_parser.is_const(function) else self.member
@@ -289,16 +280,13 @@ class WrapperFunctionExtractor(HandleFunctionExtractor):
             return
         code = function.get_declaration()
         code += '{ assert ( ' + self.const_member + ' ) ; '
-        code += function.return_str + self.function_table + ' . ' + function.name
+        code += function.return_str + self.function_table + ' . ' + util.get_name_for_variable(function.name)
         code += ' ( ' + member
         arguments = cpp_file_parser.get_function_arguments_in_single_call(function)
         if arguments:
             code += ' , ' + arguments
         code += ' ) ; }'
 
-        comment = util.get_comment(self.comments, function.get_declaration())
-        if comment:
-            self.scope.add(cpp_file_parser.Comment(comment))
         self.scope.add(cpp_file_parser.get_function_from_text(self.classname,function.name,function.return_str,
                                                               code))
 
@@ -306,14 +294,10 @@ class WrapperFunctionExtractor(HandleFunctionExtractor):
 
 def add_interface(data, scope, class_scope, detail_namespace):
     impl = code.IMPL if data.table else code.HANDLE
-    comments = parser_addition.extract_comments(data.file)
-    comment = util.get_comment(comments, class_scope.get_type() + ' ' + class_scope.get_name())
-    if comment:
-        scope.add(cpp_file_parser.Comment(comment))
     if cpp_file_parser.is_class(class_scope):
-        scope.add(cpp_file_parser.Class(class_scope.get_name()))
+        scope.add(cpp_file_parser.Class(class_scope.get_name(), class_scope.get_tokens()))
     else:
-        scope.add(cpp_file_parser.Struct(class_scope.get_name()))
+        scope.add(cpp_file_parser.Struct(class_scope.get_name(), class_scope.get_tokens()))
 
     add_default_interface(data, scope, class_scope, detail_namespace)
     if data.table:
@@ -322,9 +306,10 @@ def add_interface(data, scope, class_scope, detail_namespace):
         if data.table and data.copy_on_write:
             member = 'write ( )'
             const_member = 'read ( )'
-        class_scope.visit(WrapperFunctionExtractor(class_scope.get_name(), scope, comments, member, const_member))
+        class_scope.visit(WrapperFunctionExtractor(class_scope.get_name(), scope, member, const_member))
     else:
-        class_scope.visit(HandleFunctionExtractor(scope, data.copy_on_write, comments))
+        class_scope.visit(HandleFunctionExtractor(scope, data.copy_on_write))
+    add_casts(data, scope, class_scope.get_name(), detail_namespace)
 
     add_private_section(data, scope, detail_namespace, class_scope.get_name(), impl)
     scope.close()
@@ -372,14 +357,22 @@ def write_file(data):
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
 
-    scope = get_interface_file(data, processor.content)
+    scope = get_interface_file(data, processor.scope)
     scope.visit(cpp_file_parser.SortClass())
+    include_guard = parser_addition.extract_include_guard(data.file)
+    scope.content.insert(0, cpp_file_parser.IncludeGuard(include_guard))
+    if not include_guard.startswith('#pragma once'):
+        scope.content.append(cpp_file_parser.ScopeEntry('Macro endif', '#endif\n'))
+
+    cpp_file_parser.add_comments(scope, parser_addition.extract_comments(data.file))
+
     if data.header_only:
-        to_string.write_scope(scope, data.interface_file)
+        to_string.write_scope(scope, data.interface_file, to_string.Visitor(), not data.no_warning_header)
     else:
-        to_string.write_scope(scope, data.interface_file, to_string.VisitorForHeaderFile())
+        to_string.write_scope(scope, data.interface_file, to_string.VisitorForHeaderFile(), not data.no_warning_header)
         source_filename = get_source_filename(data.interface_file)
 
-        scope = get_interface_file(data, processor.content, for_header_file=False)
+        scope = get_interface_file(data, processor.scope, for_header_file=False)
         scope.visit(cpp_file_parser.SortClass())
-        to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile())
+        to_string.write_scope(scope, source_filename, to_string.VisitorForSourceFile(), not data.no_warning_header)
+

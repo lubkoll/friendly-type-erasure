@@ -1,12 +1,10 @@
-import argparse
+import code
 import copy
+import os
 import re
-from subprocess import call
 
-import clang_util
 import file_parser
 import cpp_file_parser
-import file_writer
 import parser_addition
 import to_string
 import util
@@ -26,7 +24,7 @@ def replace_type_in_arguments(old_name, new_name, arguments):
 
 
 def replace_classname_impl(old_name, new_name, scope_class):
-    scope_class.name = new_name
+    scope_class.name = old_name + '::' + new_name
     for i in range(len(scope_class.content)):
         type = scope_class.content[i].type
         if type in ['destructor', 'constructor', 'function']:
@@ -44,7 +42,7 @@ def replace_classname(old_name, new_name, scope):
             replace_classname_impl(old_name, new_name, entry)
         elif entry.type in ['class','namespace']:
             replace_classname(old_name, new_name, entry)
-        elif util.is_function(entry):
+        elif cpp_file_parser.is_function(entry):
             replace_entry_in_tokens(old_name, new_name, entry.tokens)
 
 
@@ -53,7 +51,7 @@ def remove_outside_class(classname, scope):
         if util.same_class(scope.content[i], classname):
             scope.content = [ scope.content[i] ]
             return
-        elif util.is_namespace(scope.content[i]):
+        elif cpp_file_parser.is_namespace(scope.content[i]):
             remove_outside_class(classname, scope.content[i])
 
 
@@ -63,7 +61,7 @@ def remove_from_class(types_to_remove, classname, scope, do_remove=False):
         if util.same_class(entry, classname):
             remove_from_class(types_to_remove, classname, entry, True)
             content.append(entry)
-        if util.is_namespace(entry):
+        if cpp_file_parser.is_namespace(entry):
             remove_from_class(types_to_remove, classname, entry)
             content.append(entry)
         if do_remove:
@@ -82,8 +80,8 @@ def remove_private_members_impl(class_scope):
     in_private_section = False
     content = []
     for entry in class_scope.content:
-        if entry.type == 'access specifier':
-            if entry.value == 'private:':
+        if cpp_file_parser.is_access_specifier(entry):
+            if entry.value == cpp_file_parser.PRIVATE:
                 in_private_section = True
             else:
                 in_private_section = False
@@ -98,17 +96,17 @@ def remove_private_members(classname, scope):
     for entry in scope.content:
         if util.same_class(entry, classname):
             remove_private_members_impl(entry)
-        if util.is_namespace(entry):
+        if cpp_file_parser.is_namespace(entry):
             remove_private_members(classname, entry)
 
 
 def add_pimpl_section(classname, pimpl_classname, scope):
     for entry in scope.content:
         if util.same_class(entry,classname):
-            entry.content.append( cpp_file_parser.ScopeEntry('access specifier', 'private:' ) )
-            entry.content.append( cpp_file_parser.ScopeEntry('forward declaration', 'class ' + pimpl_classname + ';' ) )
-            entry.content.append( cpp_file_parser.ScopeEntry('variable', 'std::unique_ptr<' + pimpl_classname + '> pimpl_;' ) )
-        if util.is_namespace(entry):
+            entry.content.append( cpp_file_parser.AccessSpecifier(cpp_file_parser.PRIVATE) )
+            entry.content.append( cpp_file_parser.ForwardDeclaration('class ' + pimpl_classname + ';' ) )
+            entry.content.append( cpp_file_parser.Variable('std::unique_ptr<' + pimpl_classname + '> pimpl_;' ) )
+        if cpp_file_parser.is_namespace(entry):
             add_pimpl_section(classname, pimpl_classname, entry)
 
 
@@ -129,38 +127,99 @@ def pimpl_function(function):
     function.tokens = new_tokens
 
 
-def pimpl_functions(classname, scope):
-    for entry in scope.content:
-        if util.is_namespace(entry):
-            pimpl_functions(classname, entry)
-        if util.is_function(entry) and entry.classname == classname:
-            pimpl_function(entry)
+class PimplFunctions(cpp_file_parser.RecursionVisitor):
+    def __init__(self, classname, private_classname):
+        self.classname = classname
+        self.private_classname = private_classname
+        self.in_pimpl = False
+
+    def visit_class(self,class_):
+        self.in_pimpl = class_.get_name() == self.classname
+        for entry in class_.content:
+            entry.visit(self)
+
+    def visit_function(self,function):
+        if not self.in_pimpl or cpp_file_parser.is_special_member_function(function):
+            return
+
+        new_function = function.get_declaration()
+        if function.type == cpp_file_parser.CONSTRUCTOR:
+            new_function += ' : pimpl_ ( new ' + self.private_classname
+            new_function += ' ( ' + cpp_file_parser.get_function_arguments_in_single_call(function) + ' ) ) { }'
+        else:
+            new_function += ' { assert ( pimpl_ ) ; '
+            new_function += function.return_str + 'pimpl_ -> ' + code.get_single_function_call(function) + ' ;'
+            new_function += '}'
+        function.tokens = [cpp_file_parser.SimpleToken(spelling) for spelling in new_function.split(' ')]
 
 
-def add_inclusion_directive_at_end(filename, scope):
-    i = 0
-    while scope.content[i].type == cpp_file_parser.include_directive:
-        i += 1
-    scope.content.insert(i, cpp_file_parser.InclusionDirective( '#include "' + filename + '"'))
+class RemoveConstructors(cpp_file_parser.RecursionVisitor):
+    def __init__(self, classname):
+        self.classname = classname
+        self.new_content = []
+
+    def visit(self, visited):
+        self.new_content.append(visited)
+
+    def visit_function(self,function):
+        if not cpp_file_parser.is_special_member_function(function):
+            self.new_content.append(function)
+
+    def visit_class(self,class_object):
+        if class_object.get_name() != self.classname:
+            return
+
+        self.new_content = []
+        for entry in class_object.content:
+            entry.visit(self)
+        class_object.content = self.new_content
 
 
-def add_inclusion_directive_at_start_if_not_present(inclusion_directive, scope):
-    present = False
-    for entry in scope.content:
-        if entry.type == 'include' and entry.value == inclusion_directive:
-            present = True
-            break
+class AddConstructorsAndAssignments(cpp_file_parser.RecursionVisitor):
+    def __init__(self, data):
+        self.data = data
 
-    if not present:
-        scope.content.insert(0, cpp_file_parser.InclusionDirective(inclusion_directive))
+    def visit_class(self,class_object):
+        if class_object.get_name() != self.data.classname:
+            return
 
+        class_object.content.append(cpp_file_parser.AccessSpecifier(cpp_file_parser.PUBLIC))
 
-def remove_inclusion_directives(scope):
-    content = []
-    for entry in scope.content:
-        if entry.type != cpp_file_parser.include_directive:
-            content.append(entry)
-    scope.content = content
+        default_constructor = self.data.classname + ' ( ) '
+        if self.data.implicit_default_constructor:
+            default_constructor += ': pimpl_( new ' + self.data.private_classname + ' ( ) ) { }'
+        else:
+            default_constructor += '{ }'
+        class_object.content.append(cpp_file_parser.get_function_from_text(self.data.classname, self.data.classname,
+                                                                           '', default_constructor,
+                                                                           cpp_file_parser.CONSTRUCTOR))
+        destructor = '~ ' + self.data.classname + ' ( ) { } '
+        class_object.content.append(cpp_file_parser.get_function_from_text(self.data.classname,
+                                                                           '~' + self.data.classname,
+                                                                           '', destructor,
+                                                                           cpp_file_parser.DESTRUCTOR))
+
+        if not self.data.non_copyable:
+            copy_assignment = code.get_pimpl_copy_assignment(self.data, self.data.classname,
+                                                             self.data.private_classname, 'pimpl_')
+            class_object.content.append(cpp_file_parser.get_function_from_text(self.data.classname, 'operator=',
+                                                                               '', copy_assignment,
+                                                                               cpp_file_parser.ASSIGNMENT_OPERATOR))
+            copy_constructor = code.get_pimpl_copy_constructor(self.data, self.data.classname,
+                                                               self.data.private_classname, 'pimpl_')
+            class_object.content.append(cpp_file_parser.get_function_from_text(self.data.classname, self.data.classname,
+                                                                               '', copy_constructor,
+                                                                               cpp_file_parser.CONSTRUCTOR))
+
+        if not self.data.non_moveable:
+            move_assignment = code.get_pimpl_move_assignment(self.data, self.data.classname, 'pimpl_')
+            class_object.content.append(cpp_file_parser.get_function_from_text(self.data.classname, 'operator=',
+                                                                               '', move_assignment,
+                                                                               cpp_file_parser.ASSIGNMENT_OPERATOR))
+            move_constructor = code.get_pimpl_move_constructor(self.data, self.data.classname, 'pimpl_')
+            class_object.content.append(cpp_file_parser.get_function_from_text(self.data.classname, self.data.classname,
+                                                                               '', move_constructor,
+                                                                               cpp_file_parser.CONSTRUCTOR))
 
 ###
 
@@ -195,29 +254,42 @@ def process_header_file(data):
     parser.parse()
 
     # write private header file
-    content = copy.deepcopy(processor.content)
-    remove_outside_class(data.classname, content)
-    remove_from_class(['alias', 'enum', 'static variable'], data.classname, content)
-    replace_classname(data.classname, data.classname + data.impl, content)
+    main_scope = copy.deepcopy(processor.scope)
+    remove_outside_class(data.classname, main_scope)
+    remove_from_class([cpp_file_parser.ALIAS, cpp_file_parser.ENUM, cpp_file_parser.STATIC_VARIABLE],
+                      data.classname, main_scope)
+    replace_classname(data.classname, data.classname + data.impl, main_scope)
 
-    to_string.write_scope(content, private_filename)
+    comments = parser_addition.extract_comments(data.file)
+    inclusion_directives = [cpp_file_parser.InclusionDirective(inclusion_directive)
+                            for inclusion_directive in
+                            util.get_inclusion_directives_for_forward_declarations(data, comments)]
+    cpp_file_parser.append_inclusion_directives(main_scope, inclusion_directives)
+
+    main_scope.visit(cpp_file_parser.SortClass())
+    to_string.write_scope(main_scope, private_filename)
     util.clang_format(private_filename)
 
     # write public header file
-    content = copy.deepcopy(processor.content)
-    remove_private_members(data.classname, content)
-    add_pimpl_section(data.classname, data.classname + data.impl, content)
-    add_inclusion_directive_at_start_if_not_present('#include <memory>', content)
+    main_scope = copy.deepcopy(processor.scope)
+    remove_private_members(data.classname, main_scope)
+    add_pimpl_section(data.classname, data.classname + data.impl, main_scope)
+    main_scope.visit(RemoveConstructors(data.classname))
+    main_scope.visit(AddConstructorsAndAssignments(data))
+    cpp_file_parser.prepend_inclusion_directives(main_scope, [cpp_file_parser.InclusionDirective('<memory>')])
 
+    visitor = to_string.VisitorForHeaderFile()
+    main_scope.visit(cpp_file_parser.SortClass())
     comments = parser_addition.extract_comments(data.file)
-    visitor = to_string.VisitorForHeaderFile(comments)
-    to_string.write_scope(content, data.interface_header_file, visitor)
+    cpp_file_parser.add_comments(main_scope, comments)
+    to_string.write_scope(main_scope, data.interface_header_file, visitor)
     util.clang_format(data.interface_header_file)
+    return main_scope
 
 
 def process_private_source_file(data, content, header_file, private_filename):
-    replace_inclusion_directive('#include "' + header_file + '"',
-                                '#include "' + get_private_name(data.interface_header_file, data.impl) + '"', content)
+    replace_inclusion_directive('"' + header_file + '"',
+                                '"' + get_private_name(data.interface_header_file, data.impl) + '"', content)
 
     replace_classname(data.classname, data.classname + data.impl, content)
 
@@ -225,33 +297,40 @@ def process_private_source_file(data, content, header_file, private_filename):
     util.clang_format(private_filename)
 
 
-def process_public_source_file(data, content):
-    pimpl_functions(data.classname, content)
-    remove_inclusion_directives(content)
-    add_inclusion_directive_at_end(data.interface_header_file, content)
-    add_inclusion_directive_at_end(get_private_name(data.interface_header_file,data.impl), content)
-    to_string.write_scope(content, data.interface_source_file, to_string.VisitorForSourceFile())
+def process_public_source_file(data, main_scope):
+    main_scope.visit(PimplFunctions(data.classname, data.private_classname))
+    cpp_file_parser.remove_inclusion_directives(main_scope)
+
+    public_header_file = os.path.basename(data.interface_header_file)
+    relative_include_files = [public_header_file, get_private_name(public_header_file,data.impl)]
+    inclusion_directives = [cpp_file_parser.InclusionDirective('"' + include + '"') for include in relative_include_files]
+    inclusion_directives.append(cpp_file_parser.InclusionDirective('<cassert>'))
+    cpp_file_parser.prepend_inclusion_directives(main_scope, inclusion_directives)
+
+    main_scope.visit(cpp_file_parser.SortClass())
+    to_string.write_scope(main_scope, data.interface_source_file, to_string.VisitorForSourceFile())
     util.clang_format(data.interface_source_file)
 
 
-def process_source_file(data):
-    header_file = data.file
-    data.file = data.cpp_file
+def process_source_file(data, main_scope):
+    if data.cpp_file:
+        header_file = data.file
+        data.file = data.cpp_file
 
-    processor = cpp_file_parser.CppFileParser()
-    parser = file_parser.GenericFileParser(processor, data)
-    parser.parse()
+        processor = cpp_file_parser.CppFileParser()
+        parser = file_parser.GenericFileParser(processor, data)
+        parser.parse()
 
-    content = copy.deepcopy(processor.content)
-    private_filename = get_private_name(data.interface_source_file, data.impl)
-    process_private_source_file(data, content, header_file, private_filename)
+        main_scope = copy.deepcopy(processor.scope)
+        private_filename = get_private_name(data.interface_source_file, data.impl)
+        process_private_source_file(data, main_scope, header_file, private_filename)
+        main_scope = copy.deepcopy(processor.scope)
 
-    content = copy.deepcopy(processor.content)
-    process_public_source_file(data, content)
+    process_public_source_file(data, main_scope)
 
 
 def pimpl_class(data):
 #    comments = parser_addition.extract_comments(data.file)
 
-    process_header_file(data)
-    process_source_file(data)
+    main_scope = process_header_file(data)
+    process_source_file(data, main_scope)

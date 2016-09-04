@@ -49,7 +49,7 @@ namespace type_erasure_vtable_detail
         if( impl )
             return static_cast<T*>( impl );
         return nullptr;
-    };
+    }
 
     template < class T >
     inline const T* cast_impl( const void* impl ) noexcept
@@ -58,7 +58,7 @@ namespace type_erasure_vtable_detail
         if( impl )
             return static_cast<const T*>( impl );
         return nullptr;
-    };
+    }
 
 
     inline char* char_ptr ( void* ptr ) noexcept

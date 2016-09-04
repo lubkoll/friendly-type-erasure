@@ -4,13 +4,16 @@ import util
 import parser_addition
 from clang.cindex import TypeKind
 
-INCLUDE_DIRECTIVE       = 'include'
+INCLUDE_GUARD           = 'include guard'
+INCLUSION_DIRECTIVE     = 'include'
 ACCESS_SPECIFIER        = 'access specifier'
 ALIAS                   = 'alias'
 CLASS                   = 'class'
 CONSTRUCTOR             = 'constructor'
 CONSTRUCTOR_TEMPLATE    = 'constructor template'
+ASSIGNMENT_OPERATOR     = 'assignment operator'
 DESTRUCTOR              = 'destructor'
+ENUM                    = 'enum'
 FUNCTION                = 'function'
 FUNCTION_TEMPLATE       = 'function template'
 NAMESPACE               = 'namespace'
@@ -27,6 +30,10 @@ scoped_types            = [NAMESPACE, CLASS, STRUCT]
 signedness              = ['signed', 'unsigned']
 builtin_integer_types   = ['int', 'short', 'long', 'long long', 'char', 'wchar_t', 'wchar16_t', 'wchar32_t']
 builtin_float_types     = ['float', 'double', 'long double' ]
+
+
+def is_include_guard(entry):
+    return entry.type == INCLUDE_GUARD
 
 
 def is_class(entry):
@@ -47,6 +54,18 @@ def is_function(entry):
 
 def is_access_specifier(entry):
     return entry.type == ACCESS_SPECIFIER
+
+
+def is_inclusion_directive(entry):
+    return entry.type == INCLUSION_DIRECTIVE
+
+
+def is_constructor(entry):
+    return entry.type == CONSTRUCTOR
+
+
+def is_destructor(entry):
+    return entry.type == DESTRUCTOR
 
 
 class ScopeEntry(object):
@@ -83,6 +102,11 @@ class ForwardDeclaration(ScopeEntry):
         return visitor.visit_forward_declaration(self)
 
 
+class IncludeGuard(ScopeEntry):
+    def __init__(self, include_guard):
+        super(IncludeGuard, self).__init__(INCLUDE_GUARD, include_guard)
+
+
 class Separator(ScopeEntry):
     def __init__(self):
         super(Separator,self).__init__(SEPARATOR,'\n')
@@ -98,7 +122,7 @@ class AccessSpecifier(ScopeEntry):
 
 class InclusionDirective(ScopeEntry):
     def __init__(self,inclusion_directive):
-        super(InclusionDirective,self).__init__(INCLUDE_DIRECTIVE,inclusion_directive)
+        super(InclusionDirective,self).__init__(INCLUSION_DIRECTIVE, inclusion_directive)
 
     def visit(self,visitor):
         return visitor.visit_inclusion_directive(self)
@@ -120,13 +144,31 @@ class StaticVariable(ScopeEntry):
         return visitor.visit_static_variable(self)
 
 
-class Scope(object):
-    def __init__(self, type, name):
+class Tokens(object):
+    def __init__(self, tokens):
+        self.tokens = [SimpleToken(token.spelling) for token in tokens]
+
+    def get_tokens(self):
+        return self.tokens
+
+    def __repr__(self):
+        str = ''
+        for token in self.tokens:
+            # libclang may append comments at the end of a function if there is no new line between.
+            # ignore these comments
+            if not token.spelling.startswith('//') and not token.spelling.startswith('/*'):
+                str += token.spelling + ' '
+        return str + '\n'
+
+
+class Scope(Tokens):
+    def __init__(self, type, name, tokens):
         self.type = type
         self.name = name
         self.content = []
         self.open_sub_scope = None
         self.current_is_forward_declaration = False
+        super(Scope, self).__init__(tokens)
 
     def get_name(self):
         return self.name
@@ -163,27 +205,31 @@ class Scope(object):
                 self.content.append(self.open_sub_scope)
                 self.open_sub_scope = None
 
+    def get_open_scope(self):
+        if self.open_sub_scope:
+            return self.open_sub_scope.get_open_scope()
+        return self
+
 
 class Class(Scope):
-    def __init__(self, name):
-        super(Class,self).__init__(CLASS, name)
+    def __init__(self, name, tokens=[]):
+        super(Class,self).__init__(CLASS, name, tokens)
 
     def visit(self,visitor):
         return visitor.visit_class(self)
 
 
 class Struct(Scope):
-    def __init__(self, name):
-        super(Struct,self).__init__(STRUCT, name)
+    def __init__(self, name, tokens=[]):
+        super(Struct,self).__init__(STRUCT, name, tokens)
 
     def visit(self,visitor):
         return visitor.visit_class(self)
 
 
 class TemplateStruct(Scope):
-    def __init__(self, name, tokens=None):
-        self.tokens = (tokens and [SimpleToken(token.spelling) for token in tokens] or [])
-        super(TemplateStruct,self).__init__(STRUCT, name)
+    def __init__(self, name, tokens=[]):
+        super(TemplateStruct,self).__init__(STRUCT, name, tokens)
 
     def visit(self,visitor):
         return visitor.visit_template_class(self)
@@ -194,8 +240,8 @@ def get_template_struct_from_text(name, text):
 
 
 class Namespace(Scope):
-    def __init__(self, name):
-        super(Namespace,self).__init__(NAMESPACE, name)
+    def __init__(self, name, tokens=[]):
+        super(Namespace,self).__init__(NAMESPACE, name, tokens)
 
     def visit(self,visitor):
         return visitor.visit_namespace(self)
@@ -272,6 +318,7 @@ def get_declaration_end_index(name, tokens):
     for i in range(index, len(tokens)):
         if tokens[i].spelling in [clang_util.open_brace, clang_util.semicolon, ':']:
             return i
+    return len(tokens)
 
 
 def get_arguments_end_index(name, tokens):
@@ -285,31 +332,27 @@ def get_arguments_end_index(name, tokens):
 
 def get_body_end_index(name, tokens):
     index = get_declaration_end_index(name, tokens)
+    if index == len(tokens):
+        return index
+    if tokens[index].spelling == clang_util.semicolon:
+        return index+1
+
+    index = clang_util.get_end_of_member_initialization(index, tokens)
+
+    while tokens[index].spelling != clang_util.open_brace:
+        index += 1
 
     counter = InTypeCounter()
-    counter.process(clang_util.open_brace)
+    counter.process(tokens[index].spelling)
     for i in range(index + 1, len(tokens)):
         counter.process(tokens[i].spelling)
         if counter.initial_state():
             return i+1
+    return len(tokens)
 
 
 def get_body_range(name, tokens):
     return [get_declaration_end_index(name,tokens), get_body_end_index(name, tokens)]
-
-
-class Tokens(object):
-    def __init__(self, tokens):
-        self.tokens = [SimpleToken(token.spelling) for token in tokens]
-
-    def __repr__(self):
-        str = ''
-        for token in self.tokens:
-            # libclang may append comments at the end of a function if there is no new line between.
-            # ignore these comments
-            if not token.spelling.startswith('//') and not token.spelling.startswith('/*'):
-                str += token.spelling + ' '
-        return str + '\n'
 
 
 def get_name_index(function_argument):
@@ -338,11 +381,14 @@ class FunctionArgument(Tokens):
     def is_const(self):
         counter = InTypeCounter()
         for i in range(len(self.tokens)):
-            spelling = tokens[i].spelling
+            spelling = self.tokens[i].spelling
             counter.process(spelling)
-            if counter.initial_state() and spelling == 'const' and not (i and tokens[i-1].spelling == '*'):
+            if counter.initial_state() and spelling == 'const' and not (i and self.tokens[i-1].spelling == '*'):
                 return True
         return False
+
+    def type(self):
+        return util.concat(self.tokens[:get_name_index(self)], ' ')
 
     def is_rvalue(self):
         last_type_token = self.tokens[get_name_index(self) - 1]
@@ -422,7 +468,7 @@ def is_const(function):
 
 
 class Function(Tokens):
-    def __init__(self, classname, functionname, return_str, tokens, function_type='function'):
+    def __init__(self, classname, functionname, return_str, tokens, function_type=FUNCTION):
         self.type = function_type
         self.classname = classname
         self.return_str = return_str
@@ -469,57 +515,93 @@ def get_function_from_text(classname, functionname, return_str, text, function_t
     return Function(classname, functionname, return_str, [SimpleToken(spelling) for spelling in text.split(' ')], function_type)
 
 
+def is_special_member_function(function):
+    if not function.classname:
+        return False
+    if is_destructor(function):
+        return True
+    if is_constructor(function) and len(get_function_arguments(function)) == 0:
+        return True
+
+    if is_constructor(function) or function.name == 'operator=':
+        args = get_function_arguments(function)
+        # default constructor
+        if len(args) == 0:
+            return True
+        # copy or move constructor
+        if len(args) == 1 and ( util.same_signature(args[0].type(), function.classname + ' &&') or \
+                                util.same_signature(args[0].type(), 'const ' + function.classname + ' &') ):
+            return True
+
+
 class CppFileParser(file_parser.FileProcessor):
     def __init__(self):
-        self.content = Namespace('global')
+        self.scope = Namespace('global')
 
     def process_inclusion_directive(self, data, cursor):
-        self.content.add( InclusionDirective( clang_util.parse_inclusion_directive(data, cursor) ).replace('#include ', '') )
+        self.scope.add(InclusionDirective(clang_util.parse_inclusion_directive(data, cursor).replace('#include ', '').replace('\n', '')))
 
     def process_open_include_guard(self, filename):
-        self.content.add( ScopeEntry( 'include_guard', parser_addition.extract_include_guard(filename)) )
+        self.scope.add(ScopeEntry('include_guard', parser_addition.extract_include_guard(filename)))
 
     def process_headers(self, headers):
-        self.content.add( ScopeEntry( 'headers', headers ) )
+        self.scope.add(ScopeEntry('headers', headers))
 
-    def process_open_namespace(self, namespace_name):
-        self.content.add( Namespace(namespace_name) )
+    def process_open_namespace(self, data, cursor):
+        self.scope.add(Namespace(cursor.spelling, clang_util.get_tokens(data.tu, cursor)))
 
     def process_close_namespace(self):
-        self.content.close()
+        self.scope.close()
 
     def process_open_class(self, data, cursor):
         if clang_util.get_tokens(data.tu, cursor)[2].spelling == clang_util.semicolon:
-            self.content.add( ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu,cursor)[:3], ' ')) )
+            self.scope.add(ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu, cursor)[:3], ' ')))
         else:
-            self.content.add( Class(data.current_struct.spelling) )
+            self.scope.add(Class(data.current_struct.spelling, clang_util.get_tokens(data.tu, cursor)))
 
     def process_open_struct(self, data, cursor):
         if clang_util.get_tokens(data.tu, cursor)[2].spelling == clang_util.semicolon:
-            self.content.add( ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu,cursor)[:3], ' ')) )
+            self.scope.add(ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu, cursor)[:3], ' ')))
         else:
-            self.content.add( Struct(data.current_struct.spelling) )
+            self.scope.add(Struct(data.current_struct.spelling, clang_util.get_tokens(data.tu, cursor)))
 
     def process_close_class(self):
-        self.content.close()
+        self.scope.close()
 
     def process_function(self, data, cursor):
         classname = ''
         if data.current_struct.spelling:
             classname = data.current_struct.spelling
-        self.content.add( Function( classname, cursor.spelling, cursor.result_type.kind != TypeKind.VOID and 'return ' or '', clang_util.get_tokens(data.tu, cursor) ) )
+        current_scope = self.scope.get_open_scope()
+        tokens = clang_util.get_tokens(data.tu, cursor)
+        tokens = tokens[:get_body_end_index(cursor.spelling, tokens)]
+        if current_scope.get_tokens() and not tokens[-1].spelling == clang_util.semicolon:
+            tokens = clang_util.get_all_tokens(tokens, current_scope.get_tokens())
+        self.scope.add(Function(classname, cursor.spelling, cursor.result_type.kind != TypeKind.VOID and 'return ' or '', tokens))
 
     def process_constructor(self, data, cursor):
-        self.process_function(data, cursor)
+        classname = ''
+        if data.current_struct.spelling:
+            classname = data.current_struct.spelling
+        current_scope = self.scope.get_open_scope()
+        tokens = clang_util.get_tokens(data.tu, cursor)
+        tokens = tokens[:get_body_end_index(cursor.spelling, tokens)]
+        if current_scope.get_tokens() and not tokens[-1].spelling == clang_util.semicolon:
+            tokens = clang_util.get_all_tokens(tokens, current_scope.get_tokens())
+        self.scope.add(Function(classname, cursor.spelling, cursor.result_type.kind != TypeKind.VOID and 'return ' or '', tokens, CONSTRUCTOR))
 
     def process_destructor(self, data, cursor):
         self.process_function(data, cursor)
 
     def process_type_alias(self,data,cursor):
-        self.content.add(Alias(cursor.spelling, clang_util.get_tokens(data.tu,cursor)))
+        self.scope.add(Alias(cursor.spelling, clang_util.get_tokens(data.tu, cursor)))
 
     def process_variable_declaration(self,data,cursor):
-        variable_declaration = clang_util.get_variable_declaration(data.tu, cursor)
+        tokens = clang_util.get_tokens(data.tu, cursor)
+        if tokens[-1].spelling != clang_util.semicolon and self.scope.get_open_scope().get_tokens():
+            tokens = clang_util.get_all_variable_tokens(tokens, self.scope.get_open_scope().get_tokens())
+
+        variable_declaration = util.concat(tokens, ' ')
         # in case that an underlying type is specified,
         # clang interprets enums at variables.
         # filter out these cases:
@@ -527,9 +609,9 @@ class CppFileParser(file_parser.FileProcessor):
             #TODO try to find a workaround for this
             return
         if clang_util.get_tokens(data.tu, cursor)[0].spelling == 'static':
-            self.content.add( StaticVariable(variable_declaration))
+            self.scope.add(StaticVariable(variable_declaration))
         else:
-            self.content.add( Variable( variable_declaration ) )
+            self.scope.add(Variable(variable_declaration))
 
     def process_member_variable_declaration(self,data,cursor):
         self.process_variable_declaration(data, cursor)
@@ -538,10 +620,10 @@ class CppFileParser(file_parser.FileProcessor):
         pass
 
     def process_enum(self,data,cursor):
-        self.content.add( ScopeEntry( 'enum', clang_util.get_enum_definition(data.tu, cursor) ) )
+        self.scope.add(ScopeEntry('enum', clang_util.get_enum_definition(data.tu, cursor)))
 
     def process_access_specifier(self, data, cursor):
-        self.content.add( AccessSpecifier( clang_util.get_tokens(data.tu, cursor)[0].spelling ) )
+        self.scope.add(AccessSpecifier(clang_util.get_tokens(data.tu, cursor)[0].spelling))
 
 
 class Visitor(object):
@@ -641,6 +723,7 @@ class ExtractTypes(Visitor):
         self.destructor = []
         self.operators = []
         self.functions = []
+        self.forward_declarations = []
         self.variables = []
         self.comment = None
 
@@ -648,6 +731,9 @@ class ExtractTypes(Visitor):
         self.comment = comment
 
     def visit_function(self,function):
+        if function.type in [ASSIGNMENT_OPERATOR]:
+            self.comment = append_comment(self.comment, self.operators)
+            self.operators.append(function)
         if function.type in [FUNCTION, FUNCTION_TEMPLATE]:
             if function.name.startswith('operator'):
                 self.comment = append_comment(self.comment, self.operators)
@@ -674,9 +760,12 @@ class ExtractTypes(Visitor):
         self.comment = append_comment(self.comment,self.aliases)
         self.aliases.append(alias)
 
+    def visit_forward_declaration(self,forward_declaration):
+        self.forward_declarations.append(forward_declaration)
 
-def extend_section(new_section, section_part):
-    if new_section and section_part:
+
+def extend_section(new_section, section_part, with_separator=True):
+    if new_section and section_part and with_separator:
         new_section.append(Separator())
     new_section.extend(section_part)
 
@@ -693,7 +782,8 @@ def sort_section(section):
     extend_section(new_section, type_extractor.destructor)
     extend_section(new_section, type_extractor.operators)
     extend_section(new_section, type_extractor.functions)
-    extend_section(new_section, type_extractor.variables)
+    extend_section(new_section, type_extractor.forward_declarations)
+    extend_section(new_section, type_extractor.variables, with_separator=False)
     return new_section
 
 
@@ -715,3 +805,56 @@ class SortClass(RecursionVisitor):
         if section_extractor.private_section:
             class_.content.append(AccessSpecifier(PRIVATE))
             class_.content.extend(section_extractor.private_section)
+
+
+def remove_inclusion_directives(main_scope):
+    new_scope = []
+    for entry in main_scope.content:
+        if not is_inclusion_directive(entry):
+            new_scope.append(entry)
+    main_scope.content = new_scope
+
+
+def prepend_inclusion_directives(main_scope, inclusion_directives):
+    for inclusion_directive in reversed(inclusion_directives):
+        main_scope.content.insert(0, inclusion_directive)
+
+
+def append_inclusion_directive(main_scope, inclusion_directive):
+    for i in range(len(main_scope.content)):
+        if not is_inclusion_directive(main_scope.content[i]):
+            main_scope.content.insert(i, inclusion_directive)
+            return
+
+
+def append_inclusion_directives(main_scope, inclusion_directives):
+    for inclusion_directive in inclusion_directives:
+        append_inclusion_directive(main_scope, inclusion_directive)
+
+
+
+def add_comment(new_content, entry, comments):
+    comment = util.get_comment(comments, entry)
+    if comment:
+        new_content.append(Comment(comment))
+
+
+def add_comments(scope, comments):
+    new_content = []
+    for entry in scope.content:
+        if is_namespace(entry):
+            add_comment(new_content, 'namespace ' + entry.name, comments)
+            add_comments(entry, comments)
+        elif is_class(entry) or is_struct(entry):
+            add_comment(new_content, entry.type + ' ' + entry.name, comments)
+            add_comments(entry, comments)
+        elif entry.type in [FUNCTION, CONSTRUCTOR, DESTRUCTOR, FUNCTION_TEMPLATE, ASSIGNMENT_OPERATOR]:
+            add_comment(new_content, entry.get_declaration(), comments)
+        elif entry.type == ALIAS:
+            add_comment(new_content, util.concat(entry.tokens, ' '), comments)
+#        else:
+#            comment = util.get_comment(comments, entry.value)
+#            if comment:
+#                new_content.append(Comment(comment))
+        new_content.append(entry)
+    scope.content = new_content

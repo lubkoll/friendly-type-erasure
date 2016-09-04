@@ -47,10 +47,11 @@ DisableFormat:   false
 ExperimentalAutoDetectBinPacking: false
 ForEachMacros:   [ foreach, Q_FOREACH, BOOST_FOREACH ]
 IncludeCategories: 
-  - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
-    Priority:        2
+  - Regex:           '^"(Spacy)/'
+    Priority:        5
   - Regex:           '^(<|"(gtest|isl|json)/)'
     Priority:        3
+  - Regex:           '^(<(array|algorithm|cassert|chrono|cmath|cstdlib|iostream|limits|list|map|memory|numeric|random|set|stdexcept|string|vector|type_traits|utility)>)'
   - Regex:           '.*'
     Priority:        1
 IndentCaseLabels: false

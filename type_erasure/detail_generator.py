@@ -135,6 +135,8 @@ def add_handle(data, scope, class_scope):
     scope.add( cpp_file_parser.ScopeEntry('code fragment', code.get_handle_specialization(data)))
 
 
+
+
 class FunctionPointerExtractor(cpp_file_parser.RecursionVisitor):
     def __init__(self,scope):
         self.scope = scope
@@ -143,7 +145,8 @@ class FunctionPointerExtractor(cpp_file_parser.RecursionVisitor):
         pass
 
     def visit_function(self,function):
-        function_pointer_alias = function.name + '_function'
+        name = util.get_name_for_variable(function.name)
+        function_pointer_alias = name + '_function'
         function_pointer_alias_definition = 'using ' + function_pointer_alias + ' = '
 
         index, offset = cpp_file_parser.find_function_name(function.name, function.tokens)
@@ -160,15 +163,15 @@ class FunctionPointerExtractor(cpp_file_parser.RecursionVisitor):
         function_pointer_alias_definition += ';'
 
         self.scope.add(cpp_file_parser.get_alias_from_text(function_pointer_alias, function_pointer_alias_definition))
-        self.scope.add(cpp_file_parser.Variable(function_pointer_alias + ' ' + function.name + ';'))
+        self.scope.add(cpp_file_parser.Variable(function_pointer_alias + ' ' + name + ';'))
 
 
 def add_table(data, scope, class_scope):
     if data.small_buffer_optimization:
-        function_table = 'template < class Buffer > struct function_table'
-        scope.add(cpp_file_parser.get_template_struct_from_text('function_table', function_table))
+        function_table = 'template < class Buffer > struct ' + code.FUNCTION_TABLE_TYPE
+        scope.add(cpp_file_parser.get_template_struct_from_text(code.FUNCTION_TABLE_TYPE, function_table))
     else:
-        scope.add(cpp_file_parser.Struct('function_table'))
+        scope.add(cpp_file_parser.Struct(code.FUNCTION_TABLE_TYPE))
     if data.copy_on_write:
         clone_function = 'using clone_function = void ( * ) ( void * , std :: shared_ptr < void > & ) ;'
         scope.add(cpp_file_parser.get_alias_from_text('clone_function', clone_function))
@@ -203,8 +206,13 @@ class FunctionPointerWrapperExtractor(cpp_file_parser.RecursionVisitor):
         pass
 
     def visit_function(self,function):
+        name = util.get_name_for_variable(function.name)
         index, offset = cpp_file_parser.find_function_name(function.name, function.tokens)
-        wrapper = 'static ' +  util.concat( function.tokens[:index+offset], ' ' )
+        wrapper = 'static ' +  util.concat(function.tokens[:index], ' ')
+        if function.tokens[index].spelling.startswith('operator'):
+            wrapper += name + ' ( '
+        else:
+            wrapper += util.concat(function.tokens[index:index+offset], ' ')
         wrapper += 'void * impl '
         arguments = cpp_file_parser.get_function_arguments(function)
         for arg in arguments:
@@ -226,7 +234,7 @@ class FunctionPointerWrapperExtractor(cpp_file_parser.RecursionVisitor):
                 wrapper += ' ,  '
         wrapper += ' ) ; }'
 
-        self.scope.add(cpp_file_parser.get_function_from_text('execution_wrapper', function.name, function.return_str,
+        self.scope.add(cpp_file_parser.get_function_from_text('execution_wrapper', name, function.return_str,
                                                               wrapper))
 
 
@@ -265,6 +273,10 @@ def get_detail_file_impl(data, scope, interface_scope):
 
 def get_detail_file(data, interface_scope):
     main_scope = cpp_file_parser.Namespace('global')
+    main_scope.add(cpp_file_parser.ScopeEntry(cpp_file_parser.INCLUDE_GUARD, '#pragma once\n'))
+    for entry in interface_scope.content:
+        if cpp_file_parser.is_inclusion_directive(entry):
+            main_scope.add(entry)
     main_scope.add( cpp_file_parser.InclusionDirective('<functional>') )
     if data.copy_on_write:
         main_scope.add(cpp_file_parser.InclusionDirective('<memory>'))
@@ -287,5 +299,5 @@ def write_file(data):
     processor = cpp_file_parser.CppFileParser()
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
-    scope = get_detail_file(data, processor.content)
-    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file))
+    scope = get_detail_file(data, processor.scope)
+    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file), to_string.Visitor(), not data.no_warning_header)
