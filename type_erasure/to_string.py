@@ -6,12 +6,18 @@ class Visitor(cpp_file_parser.Visitor):
     def visit(self,visited):
         return str(visited) + '\n'
 
-    def visit_class(self,class_):
-        str = class_.type + ' ' + class_.name + '{\n'
-        for entry in class_.content:
-            str += entry.visit(self)
-        str += '};\n\n'
-        return str
+    def visit_class(self,class_object):
+        code = ''
+        for token in class_object.get_tokens():
+            if token.spelling in [';', '{']:
+                break
+            code += token.spelling + ' '
+#        str = class_.type + ' ' + class_.name + '{\n'
+        code += '\n{\n'
+        for entry in class_object.content:
+            code += entry.visit(self)
+        code += '};\n\n'
+        return code
 
     def visit_template_class(self,template_class):
         code = util.concat(template_class.tokens,' ') + '{\n'
@@ -56,14 +62,6 @@ class VisitorForHeaderFile(Visitor):
     def visit_template_function(self, function):
        return function.get_in_place_definition() + '\n'
 
-    def visit_class(self, class_object):
-        code = class_object.type + ' ' + class_object.name
-        code += '\n{\n'
-        for entry in class_object.content:
-            code += entry.visit(self)
-        code += '};\n\n'
-        return code
-
     def visit_namespace(self, namespace):
         code = ''
         if namespace.name != 'global':
@@ -83,7 +81,8 @@ class VisitorForHeaderFile(Visitor):
         else:
             return super(VisitorForHeaderFile,self).visit_comment(comment)
 
-
+    def visit_alias(self,alias):
+        return str(alias) + '\n\n'
 
 
 class VisitorForSourceFile(Visitor):

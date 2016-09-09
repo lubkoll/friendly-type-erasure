@@ -16,8 +16,7 @@ class GenericFileParser(object):
         self.opened = []
 
     def parse(self):
-        all_clang_args = [self.data.file]
-        all_clang_args.extend(self.data.clang_args)
+        all_clang_args = self.data.clang_args
 
         index = clang.cindex.Index.create()
         self.data.tu = index.parse(None, all_clang_args, options=TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)

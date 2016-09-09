@@ -14,22 +14,28 @@ def add_aliases(data, scope, detail_namespace):
         buffer = 'using Buffer = std :: array < char , ' + data.buffer + ' > ;'
         scope.add(cpp_file_parser.get_alias_from_text('Buffer', buffer))
         if not data.table:
-            handle_base = 'using HandleBase = ' + detail_namespace + ' :: HandleBase < Buffer > ;'
+            handle_base = 'using HandleBase = ' + detail_namespace + ' :: ' + data.handle_base_typename + ' < '
+            handle_base += scope.get_open_scope().name + ' , '
+            if data.small_buffer_optimization:
+                handle_base += 'Buffer'
+            handle_base += ' > ;'
             scope.add(cpp_file_parser.get_alias_from_text('HandleBase', handle_base))
             stack_allocated_handle = 'template < class T > using StackAllocatedHandle = ' + \
-                                     detail_namespace + ' :: Handle < T , Buffer , false > ;'
+                                     detail_namespace + ' :: Handle < T , ' + scope.get_open_scope().name + \
+                                     ' , Buffer , false > ;'
             scope.add(cpp_file_parser.get_alias_from_text('StackAllocatedHandle', stack_allocated_handle))
             heap_allocated_handle = 'template < class T > using HeapAllocatedHandle = ' + \
-                                     detail_namespace + ' :: Handle < T , Buffer , true > ;'
+                                     detail_namespace + ' :: Handle < T , ' + scope.get_open_scope().name + \
+                                    ' , Buffer , true > ;'
             scope.add(cpp_file_parser.get_alias_from_text('HeapAllocatedHandle', heap_allocated_handle))
             scope.add(cpp_file_parser.Separator())
 
 
-def add_constructors(data, scope, class_scope, detail_namespace, impl=code.IMPL):
+def add_constructors(data, scope, class_scope, detail_namespace):
     classname = class_scope.get_name()
     constexpr = '' if data.small_buffer_optimization or data.table else 'constexpr'
     if data.table:
-        constructor = classname + ' ( ) noexcept : ' + impl + ' ( nullptr ) { }'
+        constructor = classname + ' ( ) noexcept : ' + data.impl_member + ' ( nullptr ) { }'
     else:
         constructor = code.get_default_default_constructor(classname,'noexcept',constexpr)
     scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
@@ -48,18 +54,15 @@ def add_constructors(data, scope, class_scope, detail_namespace, impl=code.IMPL)
                                                      code.get_handle_constructor(data, classname, detail_namespace),
                                                      cpp_file_parser.CONSTRUCTOR_TEMPLATE))
     if not data.copy_on_write or (data.table and data.copy_on_write and data.small_buffer_optimization):
-        impl = code.IMPL if data.table else code.HANDLE
         scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                         code.get_copy_constructor(data, classname, impl),
+                                                         code.get_copy_constructor(data, classname),
                                                          cpp_file_parser.CONSTRUCTOR))
         scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                          code.get_move_constructor(data, classname, impl),
+                                                          code.get_move_constructor(data, classname),
                                                           cpp_file_parser.CONSTRUCTOR) )
 
 
 def add_operators(data, scope, classname, detail_namespace):
-    impl = code.IMPL if data.table else code.HANDLE
-
     # assignment operators
     scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
                                                      code.get_assignment_from_value(data, classname, detail_namespace),
@@ -67,30 +70,29 @@ def add_operators(data, scope, classname, detail_namespace):
 
     if not data.copy_on_write or (data.table and data.copy_on_write and data.small_buffer_optimization):
         scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
-                                                         code.get_copy_operator(data, classname, impl)))
+                                                         code.get_copy_operator(data, classname)))
 
         scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
-                                                         code.get_move_operator(data, classname, impl)))
+                                                         code.get_move_operator(data, classname)))
 
     # operator bool
     function = cpp_file_parser.get_function_from_text(classname, 'operator bool', 'return ',
-                                                      code.get_operator_bool_for_member_ptr(impl))
+                                                      code.get_operator_bool_for_member_ptr(data.impl_member))
     comment = code.get_operator_bool_comment(function.get_declaration())
     scope.add(cpp_file_parser.Comment(comment))
     scope.add(function)
 
 
 def add_casts(data, scope, classname, detail_namespace):
-    impl = code.IMPL if data.table else code.HANDLE
     function = cpp_file_parser.get_function_from_text(classname, 'target', 'return ',
-                                                      code.get_cast(data, impl, detail_namespace, ''),
+                                                      code.get_cast(data, classname, detail_namespace, ''),
                                                       cpp_file_parser.FUNCTION_TEMPLATE)
     comment = code.get_handle_cast_comment(function.get_declaration())
     scope.add(cpp_file_parser.Comment(comment))
     scope.add(function)
 
     function = cpp_file_parser.get_function_from_text(classname, 'target', 'return ',
-                                                      code.get_cast(data, impl, detail_namespace, 'const'),
+                                                      code.get_cast(data, classname, detail_namespace, 'const'),
                                                       cpp_file_parser.FUNCTION_TEMPLATE)
     comment = code.get_handle_cast_comment(function.get_declaration(), 'const')
     scope.add(cpp_file_parser.Comment(comment))
@@ -103,12 +105,10 @@ def add_default_interface(data, scope, class_scope, detail_namespace):
     add_aliases(data, scope, detail_namespace)
     scope.add( cpp_file_parser.AccessSpecifier(cpp_file_parser.PUBLIC) )
     add_constructors(data, scope, class_scope, detail_namespace)
-    impl = code.IMPL if data.table else code.HANDLE
-    function_table = code.FUNCTION_TABLE
     if not data.copy_on_write:
         if data.table and not data.small_buffer_optimization:
-            destructor = '~ ' + classname + ' ( ) { if ( ' + impl + ' ) '
-            destructor += function_table + ' . del ( ' + impl + ' ) ; }'
+            destructor = '~ ' + classname + ' ( ) { if ( ' + data.impl_member + ' ) '
+            destructor += data.function_table_member + ' . del ( ' + data.impl_member + ' ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, '~'+classname, '',
                                                          destructor, 'destructor'))
         else:
@@ -121,65 +121,70 @@ def add_default_interface(data, scope, class_scope, detail_namespace):
 #    add_casts(data, scope, classname, detail_namespace)
 
 
-def add_private_section(data, scope, detail_namespace, classname, impl, function_table=code.FUNCTION_TABLE):
+def add_private_section(data, scope, detail_namespace, classname):
     scope.add(cpp_file_parser.AccessSpecifier(cpp_file_parser.PRIVATE))
 
     if data.copy_on_write:
-        return_type = 'void *' if data.table else 'const HandleBase &'
-        if not data.small_buffer_optimization:
-            return_type = return_type.replace('HandleBase', detail_namespace + ' :: HandleBase')
+        if data.table:
+            return_type = 'void *'
+            const_return_type = return_type
+        else:
+            if data.copy_on_write and data.small_buffer_optimization:
+                return_type = data.handle_base_typename
+            else:
+                return_type = data.handle_base_typename + ' < ' + classname
+                if data.small_buffer_optimization:
+                    return_type += ' , Buffer '
+                return_type += ' > '
+            return_type += ' & '
+            if not data.small_buffer_optimization:
+                return_type = return_type.replace(data.handle_base_typename, detail_namespace + ' :: ' + data.handle_base_typename)
+            const_return_type = 'const ' + return_type
 
         scope.add(cpp_file_parser.get_function_from_text(classname, 'read', 'return ',
-                                                         code.get_read_function(data, return_type, impl)))
-        return_type = 'void *' if data.table else 'HandleBase &'
-        if not data.small_buffer_optimization:
-            return_type = return_type.replace('HandleBase', detail_namespace + ' :: HandleBase')
+                                                         code.get_read_function(data, const_return_type,
+                                                                                data.impl_member)))
         scope.add(cpp_file_parser.get_function_from_text(classname, 'write', 'return ',
-                                                         code.get_write_function(data, return_type, impl)))
+                                                         code.get_write_function(data, return_type, data.impl_member)))
 
     if data.table:
+        function_table_var = detail_namespace + '::' + data.function_table_type + '<' + classname
         if data.small_buffer_optimization:
-            scope.add(cpp_file_parser.Variable(detail_namespace + '::' + code.FUNCTION_TABLE_TYPE + '<Buffer>' + function_table + ';'))
-        else:
-            scope.add(cpp_file_parser.Variable(detail_namespace + '::' + code.FUNCTION_TABLE_TYPE + ' ' + function_table + ';'))
+            function_table_var += ', Buffer'
+        function_table_var += '>' + data.function_table_member + ';'
+        scope.add(cpp_file_parser.Variable(function_table_var))
+
         if data.copy_on_write:
-            scope.add(cpp_file_parser.Variable('std::shared_ptr<void> ' + impl + ' = nullptr;'))
+            scope.add(cpp_file_parser.Variable('std::shared_ptr<void> ' + data.impl_member + ' = nullptr;'))
         else:
-            scope.add(cpp_file_parser.Variable('void* ' + impl + ' = nullptr;'))
+            scope.add(cpp_file_parser.Variable('void* ' + data.impl_member + ' = nullptr;'))
         if data.small_buffer_optimization and not data.copy_on_write:
-            reset = 'void reset ( ) noexcept { if ( ' + impl + ' && type_erasure_vtable_detail :: is_heap_allocated ' \
-                    '( ' + impl + ' , buffer_ ) ) ' + function_table + ' . del ( ' + impl + ' ) ; }'
+            reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' && type_erasure_vtable_detail :: is_heap_allocated ' \
+                    '( ' + data.impl_raw_member + ' , buffer_ ) ) ' + data.function_table_member + ' . del ( ' + data.impl_member + ' ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, 'reset', '', reset))
 
-            clone_into = 'void * clone_into ( Buffer & buffer ) const { if ( ! ' + impl + ' ) return nullptr ; '
-            clone_into += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( ' + impl + ' , buffer_ ) ) '
-            clone_into += 'return ' + function_table + ' . clone ( impl ) ; else '
-            clone_into += 'return ' + function_table + ' . clone_into ( ' + impl + ' , buffer ) ; }'
+            clone_into = 'void * clone_into ( Buffer & buffer ) const { if ( ! ' + data.impl_member + ' ) return nullptr ; '
+            clone_into += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) '
+            clone_into += 'return ' + data.function_table_member + ' . clone ( ' + data.impl_member + ' ) ; else '
+            clone_into += 'return ' + data.function_table_member + ' . clone_into ( ' + data.impl_member + ' , buffer ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, 'clone_into', 'return ', clone_into))
 
     else:
         if data.small_buffer_optimization and not data.copy_on_write:
-            reset = 'void reset ( ) noexcept { if ( ' + impl + ' ) ' + impl + ' -> destroy ( ) ; }'
+            reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' ) ' + data.impl_member + ' -> destroy ( ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, 'reset', '', reset))
 
-        if data.copy_on_write and data.small_buffer_optimization:
-            scope.add(cpp_file_parser.Variable('std::shared_ptr< HandleBase > handle_ = nullptr;'))
-        elif not data.copy_on_write and data.small_buffer_optimization:
-            scope.add(cpp_file_parser.Variable('HandleBase * handle_ = nullptr ;'))
-        elif data.copy_on_write and not data.small_buffer_optimization:
-            scope.add(cpp_file_parser.Variable('std::shared_ptr< ' + detail_namespace + '::HandleBase > handle_ = nullptr;'))
-        else:
-            scope.add(cpp_file_parser.Variable('std::unique_ptr< ' + detail_namespace + '::HandleBase > handle_ = nullptr;'))
+        scope.add(cpp_file_parser.Variable(data.get_impl_type(detail_namespace, classname) + ' ' + data.impl_member + ' = nullptr;'))
 
     if data.small_buffer_optimization:
         scope.add(cpp_file_parser.Variable('Buffer buffer_ ;'))
 
 
 class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
-    def __init__(self, scope, copy_on_write):
+    def __init__(self, data, scope):
+        self.data = data
         self.scope = scope
         self.in_private_section = True
-        self.copy_on_write = copy_on_write
 
     def visit_access_specifier(self, access_specifier):
         self.in_private_section = access_specifier.value == cpp_file_parser.PRIVATE
@@ -204,24 +209,41 @@ class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
         if self.in_private_section:
             return
 
-        code = util.concat(function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)],
-                           ' ')
-        code += ' { assert ( handle_ ) ; ' + function.return_str
-        if self.copy_on_write:
+        code = util.concat(function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)], ' ')
+        code += ' { assert ( ' + self.data.impl_member + ' ) ; ' + function.return_str
+        if self.data.copy_on_write:
             if cpp_file_parser.is_const(function):
                 code += 'read ( ) . '
             else:
                 code += 'write ( ) . '
         else:
-            code += 'handle_ -> '
-        code += function.name + ' ( ' + cpp_file_parser.get_function_arguments_in_single_call(function) + ' ) ; }'
+            code += self.data.impl_member + ' -> '
+        code += util.get_function_name_for_type_erasure(function.name) + ' ( * this '
+        arguments = cpp_file_parser.get_function_arguments(function)
+        for arg in arguments:
+            code += ' , '
+            if self.scope.get_open_scope().name + ' &' in arg.type():
+                code += ' * ' + arg.in_single_function_call() + ' . ' + self.data.impl_member + ' '
+            elif self.scope.get_open_scope().name + ' *' in arg.type():
+                    code += arg.in_single_function_call() + ' -> ' + self.data.impl_member
+            else:
+                code += arg.in_single_function_call()
+        code += ' ) ; }'
 
         self.scope.add(cpp_file_parser.get_function_from_text(function.classname, function.name, function.return_str, code))
 
 
+def get_private_base_class(classname, data):
+    private_base_class = classname + data.detail_extension + ' :: ' + data.function_table_type + ' < ' + classname
+    if data.small_buffer_optimization:
+        private_base_class += ' , ' + classname + ' :: Buffer'
+    private_base_class += ' >'
+    return private_base_class
+
+
 class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
     def __init__(self, data, classname, detail_namespace):
-        constructor = code.get_constructor_from_value_declaration(classname) + ' : function_table ( { '
+        constructor = code.get_constructor_from_value_declaration(classname) + ' : ' + data.function_table_member + ' ( { '
         if not data.copy_on_write:
             constructor += '& type_erasure_vtable_detail :: delete_impl < ' + code.get_decayed('T') + ' > , '
             constructor += '& type_erasure_vtable_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
@@ -232,24 +254,25 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
             if data.small_buffer_optimization:
                 constructor += ' , & type_erasure_vtable_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
         self.constructor = constructor
+        self.classname = classname
 
         constructor_end = ' } ) '
         if data.small_buffer_optimization:
-            constructor_end += ' , impl ( nullptr ) { '
+            constructor_end += ' , ' + data.impl_member + ' ( nullptr ) { '
             constructor_end += ' if ( sizeof ( ' + code.get_decayed('T') + ' ) <= sizeof ( Buffer ) ) '
             constructor_end += '{ new ( & buffer_ ) ' + code.get_decayed('T') + ' ( std :: forward < T > ( value ) ) ; '
             if data.copy_on_write:
-                constructor_end += 'impl = std :: shared_ptr < ' + code.get_decayed('T') + ' > ( '
+                constructor_end += data.impl_member + ' = std :: shared_ptr < ' + code.get_decayed('T') + ' > ( '
                 constructor_end += 'std :: shared_ptr < ' + code.get_decayed('T') + ' >  ( ) , '
                 constructor_end += 'static_cast < ' + code.get_decayed('T') + ' * > ( static_cast < void * > ( & buffer_ ) ) ) ; } '
-                constructor_end += 'else impl = std :: make_shared < ' + code.get_decayed('T') + ' > '
+                constructor_end += 'else ' + data.impl_member + ' = std :: make_shared < ' + code.get_decayed('T') + ' > '
                 constructor_end += '( std :: forward < T > ( value ) ) ; '
             else:
-                constructor_end += 'impl = & buffer_ ; } '
-                constructor_end += 'else impl =  new ' + code.get_decayed('T') + ' ( std :: forward < T > ( value ) ) ;'
+                constructor_end += data.impl_member + ' = & buffer_ ; } '
+                constructor_end += 'else ' + data.impl_member + ' =  new ' + code.get_decayed('T') + ' ( std :: forward < T > ( value ) ) ;'
             constructor_end += ' }'
         else:
-            constructor_end += ' , ' + code.IMPL
+            constructor_end += ' , ' + data.impl_member
             if data.copy_on_write:
                 constructor_end += ' ( std :: make_shared < ' + code.get_decayed('T') + ' > '
             else:
@@ -262,56 +285,53 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
         pass
 
     def visit_function(self,function):
-        self.constructor += ' , & ' + self.detail_namespace + ' :: execution_wrapper < ' + code.get_decayed('T') + ' > '
-        self.constructor += ' :: ' + util.get_name_for_variable(function.name)
+        self.constructor += ' , & ' + self.detail_namespace + ' :: execution_wrapper < ' + self.classname + ' , ' + code.get_decayed('T') + ' > '
+        self.constructor += ' :: ' + util.get_function_name_for_type_erasure(function.name)
 
 
 class WrapperFunctionExtractor(HandleFunctionExtractor):
-    def __init__(self, classname, scope, member=code.IMPL, const_member=code.IMPL, function_table=code.FUNCTION_TABLE):
+    def __init__(self, data, classname, scope):
+        self.data = data
         self.classname = classname
-        self.member = member
-        self.const_member = const_member
-        self.function_table = function_table
-        super(WrapperFunctionExtractor,self).__init__(scope, False)
+        super(WrapperFunctionExtractor,self).__init__(data, scope)
 
     def visit_function(self,function):
-        member = self.const_member if cpp_file_parser.is_const(function) else self.member
+        member = self.data.impl_const_access if cpp_file_parser.is_const(function) else self.data.impl_access
         if self.in_private_section:
             return
         code = function.get_declaration()
-        code += '{ assert ( ' + self.const_member + ' ) ; '
-        code += function.return_str + self.function_table + ' . ' + util.get_name_for_variable(function.name)
-        code += ' ( ' + member
-        arguments = cpp_file_parser.get_function_arguments_in_single_call(function)
-        if arguments:
-            code += ' , ' + arguments
+        code += '{ assert ( ' + self.data.impl_member + ' ) ; '
+        code += function.return_str + self.data.function_table_member + ' . ' + util.get_function_name_for_type_erasure(function.name)
+        code += ' ( * this , ' + member + ' '
+#        arguments = cpp_file_parser.get_function_arguments_in_single_call(function)
+        arguments = cpp_file_parser.get_function_arguments(function)
+        for arg in arguments:
+            code += ' , '
+            if cpp_file_parser.contains(function.classname, arg.tokens):
+                code += 'other . ' + self.data.impl_raw_member
+            else:
+                code += arg.in_single_function_call()
         code += ' ) ; }'
 
         self.scope.add(cpp_file_parser.get_function_from_text(self.classname,function.name,function.return_str,
                                                               code))
 
 
-
 def add_interface(data, scope, class_scope, detail_namespace):
-    impl = code.IMPL if data.table else code.HANDLE
     if cpp_file_parser.is_class(class_scope):
         scope.add(cpp_file_parser.Class(class_scope.get_name(), class_scope.get_tokens()))
     else:
         scope.add(cpp_file_parser.Struct(class_scope.get_name(), class_scope.get_tokens()))
 
     add_default_interface(data, scope, class_scope, detail_namespace)
+
     if data.table:
-        member = impl
-        const_member = impl
-        if data.table and data.copy_on_write:
-            member = 'write ( )'
-            const_member = 'read ( )'
-        class_scope.visit(WrapperFunctionExtractor(class_scope.get_name(), scope, member, const_member))
+        class_scope.visit(WrapperFunctionExtractor(data, class_scope.get_name(), scope))
     else:
-        class_scope.visit(HandleFunctionExtractor(scope, data.copy_on_write))
+        class_scope.visit(HandleFunctionExtractor(data, scope))
     add_casts(data, scope, class_scope.get_name(), detail_namespace)
 
-    add_private_section(data, scope, detail_namespace, class_scope.get_name(), impl)
+    add_private_section(data, scope, detail_namespace, class_scope.get_name())
     scope.close()
 
 

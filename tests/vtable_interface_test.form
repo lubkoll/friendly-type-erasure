@@ -21,6 +21,12 @@ namespace
         EXPECT_EQ( fooable.foo(), initial_value );
         fooable.set_value( new_value );
         EXPECT_EQ( fooable.foo(), new_value );
+        fooable += fooable;
+        EXPECT_EQ( fooable.foo(), 2*new_value );
+        fooable.set_value( new_value );
+        EXPECT_EQ( fooable.foo(), new_value );
+        auto other = -fooable;
+        EXPECT_EQ( other.foo(), -new_value );
     }
 
     void test_ref_interface( %class_name%& fooable, const Mock%class_name%& mock_fooable,

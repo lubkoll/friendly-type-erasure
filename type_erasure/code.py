@@ -3,19 +3,16 @@ import parser_addition
 import util
 
 
-FUNCTION_TABLE_TYPE = 'FunctionTable'
-FUNCTION_TABLE = 'function_table'
-IMPL           = 'impl'
-HANDLE         = 'handle_'
-
-
 def get_decayed(type_):
     return 'typename std :: decay < ' + type_ + ' > :: type'
 
 
-def get_return_type(data, classname):
+def get_handle_return_type(data, classname):
     if data.copy_on_write:
-        return 'std :: shared_ptr < HandleBase > '
+        if data.small_buffer_optimization:
+            return 'std :: shared_ptr < HandleBase < ' + data.interface_type + ' , Buffer > > '
+        else:
+            return 'std :: shared_ptr < HandleBase < ' + data.interface_type + ' > > '
     else:
         return classname + ' * '
 
@@ -50,8 +47,8 @@ def get_constructor_from_value_declaration(classname):
     return 'template < typename T , ' + enable_if_not_same(classname, 'T') + ' > ' + classname + ' ( T && value ) '
 
 
-def get_handle_constructor_body_for_small_buffer_optimization(clone_into):
-    return '' + HANDLE + ' = type_erasure_detail :: ' + clone_into + ' < HandleBase , StackAllocatedHandle < ' + get_decayed('T') + \
+def get_handle_constructor_body_for_small_buffer_optimization(data, clone_into):
+    return '' + data.impl_member + ' = type_erasure_detail :: ' + clone_into + ' < HandleBase , StackAllocatedHandle < ' + get_decayed('T') + \
            ' > , HeapAllocatedHandle < ' + get_decayed('T') + ' > > ( std :: forward < T > ( value ) , buffer_ ) ; '
 
 
@@ -59,10 +56,10 @@ def get_handle_constructor(data, classname, handle_namespace):
     constructor = get_constructor_from_value_declaration(classname)
     if data.small_buffer_optimization:
         clone_into = 'clone_into_shared_ptr' if data.copy_on_write else 'clone_into'
-        constructor += '{ ' + get_handle_constructor_body_for_small_buffer_optimization(clone_into) + '}'
+        constructor += '{ ' + get_handle_constructor_body_for_small_buffer_optimization(data, clone_into) + '}'
     else:
-        constructor += ': ' + HANDLE + ' ( ' + \
-                       get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' > ') + ' '
+        constructor += ': ' + data.impl_member + ' ( ' + \
+                       get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' , ' + classname + ' > ') + ' '
         constructor += '( std :: forward < T > ( value ) ) ) { }'
     return constructor
 
@@ -78,13 +75,13 @@ def get_assignment_from_value(data, classname, handle_namespace):
         clone_into = 'clone_into_shared_ptr' if data.copy_on_write else 'clone_into'
         if not data.copy_on_write:
             code += 'reset ( ) ; '
-        code += get_handle_constructor_body_for_small_buffer_optimization(clone_into)
+        code += get_handle_constructor_body_for_small_buffer_optimization(data, clone_into)
     else:
         if data.copy_on_write:
-            code += HANDLE + ' = '
+            code += data.impl_member + ' = '
         else:
-            code += '' + HANDLE + ' . reset ( '
-        code += get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' >  ')
+            code += '' + data.impl_member + ' . reset ( '
+        code += get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' , ' + classname + ' >  ')
         code += ' ( std :: forward < T > ( value ) ) '
         if not data.copy_on_write:
             code += ') '
@@ -92,44 +89,45 @@ def get_assignment_from_value(data, classname, handle_namespace):
     return code + 'return * this ; }'
 
 
-handle_copy_assignment_for_small_buffer_optimization = HANDLE + ' = other . ' + HANDLE + ' ? ' \
-                                                  'other . ' + HANDLE + ' -> clone_into ( buffer_ ) : nullptr ; '
+def get_handle_copy_assignment_for_small_buffer_optimization(data):
+    return data.impl_member + ' = other . ' + data.impl_member + ' ? other . ' + data.impl_member + ' -> clone_into ( buffer_ ) : nullptr ; '
 
 
 def get_cast_to_handle_base(buffer):
     return 'static_cast < HandleBase * >( static_cast < void * > ( ' + buffer + ' ) )'
 
 
-def get_handle_move_assignment_for_small_buffer_optimization(escape_sequence):
-    return escape_sequence + 'if ( type_erasure_detail :: is_heap_allocated ( other . ' + HANDLE + ' , other . buffer_ ) ) ' +\
-           HANDLE + ' = other . ' + HANDLE + ' ; else { buffer_ = other.buffer_ ; ' +\
-           HANDLE + ' = ' + get_cast_to_handle_base('& buffer_') + ' ; } '
+def get_handle_move_assignment_for_small_buffer_optimization(data, escape_sequence):
+    return escape_sequence + 'if ( type_erasure_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) ' + \
+           data.impl_member + ' = other . ' + data.impl_member + ' ; else { buffer_ = other.buffer_ ; ' + \
+           data.impl_member + ' = ' + get_cast_to_handle_base('& buffer_') + ' ; } '
 
 
-def get_copy_constructor_for_table(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
-    declaration = classname + ' ( const ' + classname + ' & other ) : ' + function_table + ' ( other . '
-    declaration += FUNCTION_TABLE + ' ) '
+def get_copy_constructor_for_table(data, classname):
+    declaration = classname + ' ( const ' + classname + ' & other ) : ' + data.function_table_member + ' ( other . '
+    declaration += data.function_table_member + ' ) '
     if data.small_buffer_optimization:
         if data.copy_on_write:
-            return declaration + ', ' + impl + ' ( other . ' + impl + ' ) { }'
+            return declaration + ', ' + data.impl_member + ' ( other . ' + data.impl_member + ' ) { }'
         else:
-            return declaration + '{ ' + impl + ' = other . clone_into ( buffer_ ) ; }'
+            return declaration + '{ ' + data.impl_member + ' = other . clone_into ( buffer_ ) ; }'
     else:
-        declaration += ' , ' + impl + ' ( other . ' + impl + ' ? other . ' + function_table + ' . clone ( other . ' + impl + ' ) '
+        declaration += ' , ' + data.impl_member + ' ( other . ' + data.impl_member + ' ? other . ' + \
+                       data.function_table_member + ' . clone ( other . ' + data.impl_member + ' ) '
         return declaration + ': nullptr ) { }'
 
 
-def get_copy_constructor_for_handle(data, classname, member):
+def get_copy_constructor_for_handle(data, classname):
     declaration = classname + ' ( const ' + classname + ' & other ) '
     if data.small_buffer_optimization:
-        return declaration + '{ ' + handle_copy_assignment_for_small_buffer_optimization + '}'
-    return declaration + ': ' + member + ' ( other . ' + member + ' ? other . ' + member + ' -> clone ( ) : nullptr ) { }'
+        return declaration + '{ ' + get_handle_copy_assignment_for_small_buffer_optimization(data) + '}'
+    return declaration + ': ' + data.impl_member + ' ( other . ' + data.impl_member + ' ? other . ' + data.impl_member + ' -> clone ( ) : nullptr ) { }'
 
 
 def get_pimpl_copy_constructor(data, classname, private_classname, member):
     declaration = classname + ' ( const ' + classname + ' & other ) '
     if data.small_buffer_optimization:
-        return declaration + '{ ' + handle_copy_assignment_for_small_buffer_optimization + '}'
+        return declaration + '{ ' + get_handle_copy_assignment_for_small_buffer_optimization(data) + '}'
     return declaration + ': ' + member + ' ( other . ' + member + ' ? new ' + private_classname + ' ( * other . pimpl_ ) : ' \
                                                                                                   'nullptr ) { }'
 
@@ -137,14 +135,14 @@ def get_pimpl_copy_constructor(data, classname, private_classname, member):
 def get_pimpl_move_constructor(data, classname, member):
     declaration = classname + ' ( ' + classname + ' && other ) '
     if data.small_buffer_optimization:
-        return declaration + '{ ' + handle_copy_assignment_for_small_buffer_optimization + '}'
+        return declaration + '{ ' + get_handle_copy_assignment_for_small_buffer_optimization(data) + '}'
     return declaration + ': ' + member + ' ( std::move( other ) . ' + member + ' ) { }'
 
 
 def get_pimpl_copy_assignment(data, classname, private_classname, member):
     declaration = classname + ' & ' + 'operator = ( const ' + classname + ' & other ) { '
     if data.small_buffer_optimization:
-        declaration += handle_copy_assignment_for_small_buffer_optimization
+        declaration += get_handle_copy_assignment_for_small_buffer_optimization(data)
     declaration += 'if ( other . ' + member + ' ) '
     return declaration + member + ' . reset ( new ' + private_classname + '( * other . pimpl_ ) ) ; ' \
                                                                           'else pimpl_ = nullptr ; return * this ; }'
@@ -153,113 +151,113 @@ def get_pimpl_copy_assignment(data, classname, private_classname, member):
 def get_pimpl_move_assignment(data, classname, member):
     declaration = classname + ' & ' + 'operator = ( ' + classname + ' && other ) { '
     if data.small_buffer_optimization:
-        declaration += handle_copy_assignment_for_small_buffer_optimization
+        declaration += get_handle_copy_assignment_for_small_buffer_optimization(data)
     return declaration + member + ' = std::move( other ) . ' + member + ' ; return * this ; }'
 
 
-def get_copy_constructor(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
-    return get_copy_constructor_for_table(data, classname, impl, function_table ) if data.table \
-            else get_copy_constructor_for_handle(data, classname, impl)
+def get_copy_constructor(data, classname):
+    return get_copy_constructor_for_table(data, classname) if data.table \
+            else get_copy_constructor_for_handle(data, classname)
 
 
-def get_move_constructor_for_table(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
+def get_move_constructor_for_table(data, classname):
     declaration = classname + ' ( ' + classname + ' && other ) noexcept : '
-    declaration += function_table + ' ( other . ' + function_table + ' ) '
+    declaration += data.function_table_member + ' ( other . ' + data.function_table_member + ' ) '
     if data.small_buffer_optimization:
         if data.copy_on_write:
-            declaration += '{ if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + impl + ' . get ( ) , '
-            declaration += 'other . buffer_ ) ) ' + impl + ' = std :: move ( other . ' + impl + ' ) ;'
-            declaration += 'else other . ' + function_table + ' . clone_into ( other . ' + impl + ' . get ( ) , '
-            return declaration + ' buffer_ , ' + impl + ' ) ; other . ' + impl + ' = nullptr ; }'
+            declaration += '{ if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' . get ( ) , '
+            declaration += 'other . buffer_ ) ) ' + data.impl_member + ' = std :: move ( other . ' + data.impl_member + ' ) ;'
+            declaration += 'else other . ' + data.function_table_member + ' . clone_into ( other . ' + data.impl_member + ' . get ( ) , '
+            return declaration + ' buffer_ , ' + data.impl_member + ' ) ; other . ' + data.impl_member + ' = nullptr ; }'
         else:
-            declaration += '{ if ( ! other . ' + impl + ' ) { reset ( ) ; ' + impl + ' = nullptr ; return ; } '
-            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + impl + ' , other . buffer_ ) ) '
-            declaration += impl + ' = other . ' + impl + ' ; '
-            declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + impl + ' = & buffer_ ; } '
-            return declaration + 'other . ' + impl + ' = nullptr ; }'
+            declaration += '{ if ( ! other . ' + data.impl_member + ' ) { reset ( ) ; ' + data.impl_member + ' = nullptr ; return ; } '
+            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
+            declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
+            declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + data.impl_member + ' = & buffer_ ; } '
+            return declaration + 'other . ' + data.impl_member + ' = nullptr ; }'
     else:
-        declaration += ' , ' + impl + ' ( other . ' + impl + ' ) '
-        return declaration + '{ other . ' + impl + ' = nullptr ; }'
+        declaration += ' , ' + data.impl_member + ' ( other . ' + data.impl_member + ' ) '
+        return declaration + '{ other . ' + data.impl_member + ' = nullptr ; }'
 
 
-def get_move_constructor_for_handle(data, classname, handle=HANDLE):
+def get_move_constructor_for_handle(data, classname):
     declaration = classname + ' ( ' + classname + ' && other ) noexcept '
     if data.small_buffer_optimization:
-        escape_sequence = 'if ( ! other . ' + handle + ' ) return ; '
-        declaration += '{ ' + get_handle_move_assignment_for_small_buffer_optimization(escape_sequence)
+        escape_sequence = 'if ( ! other . ' + data.impl_member + ' ) return ; '
+        declaration += '{ ' + get_handle_move_assignment_for_small_buffer_optimization(data, escape_sequence)
     else:
-        declaration += ': ' + handle + ' ( std :: move ( other.' + handle + ' ) ) { '
-    return declaration + 'other . ' + handle + ' = nullptr ; }'
+        declaration += ': ' + data.impl_member + ' ( std :: move ( other.' + data.impl_member + ' ) ) { '
+    return declaration + 'other . ' + data.impl_member + ' = nullptr ; }'
 
 
-def get_move_constructor(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
-    return get_move_constructor_for_table(data, classname, impl, function_table) if data.table \
-            else get_move_constructor_for_handle(data, classname, impl)
+def get_move_constructor(data, classname):
+    return get_move_constructor_for_table(data, classname) if data.table \
+            else get_move_constructor_for_handle(data, classname)
 
 
-def get_copy_operator_for_handle(data, classname, handle=HANDLE):
+def get_copy_operator_for_handle(data, classname):
     declaration = classname + ' & operator = ( const ' + classname + ' & other ) '
     if data.small_buffer_optimization:
-        declaration += '{ ' + handle_copy_assignment_for_small_buffer_optimization
+        declaration += '{ ' + get_handle_copy_assignment_for_small_buffer_optimization(data)
     else:
-        declaration += '{ ' + handle + ' . reset ( other . ' + handle + ' ? other . ' + handle + ' -> clone ( ) : nullptr ) ; '
+        declaration += '{ ' + data.impl_member + ' . reset ( other . ' + data.impl_member + ' ? other . ' + data.impl_member + ' -> clone ( ) : nullptr ) ; '
     return declaration + 'return * this ; }'
 
 
-def get_copy_operator_for_table(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
+def get_copy_operator_for_table(data, classname):
     declaration = classname + ' & operator = ( const ' + classname + ' & other ) { '
-    declaration += function_table + ' = other . ' + function_table + ' ; '
+    declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
     if data.small_buffer_optimization:
         if data.copy_on_write:
-            declaration += impl + ' = other . ' + impl + ' ; '
+            declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
         else:
-            declaration += impl + ' = other . clone_into ( buffer_ ) ; '
+            declaration += data.impl_member + ' = other . clone_into ( buffer_ ) ; '
     else:
-        declaration += impl + ' = other . ' + impl + ' ? other . ' + function_table + ' . clone ( other . ' + impl + ' ) '
+        declaration += data.impl_member + ' = other . ' + data.impl_member + ' ? other . ' + data.function_table_member + ' . clone ( other . ' + data.impl_member + ' ) '
         declaration += ': nullptr ;'
     return declaration + 'return * this ; }'
 
 
-def get_copy_operator(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
-    return get_copy_operator_for_table(data, classname, impl, function_table) if data.table \
-        else get_copy_operator_for_handle(data, classname, impl)
+def get_copy_operator(data, classname):
+    return get_copy_operator_for_table(data, classname) if data.table \
+        else get_copy_operator_for_handle(data, classname)
 
 
-def get_move_operator_for_table(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
+def get_move_operator_for_table(data, classname):
     declaration = classname + ' & operator = ( ' + classname + ' && other ) noexcept { '
     if data.small_buffer_optimization:
         if data.copy_on_write:
-            declaration += function_table + ' = other . ' + function_table + ' ; '
-            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + impl + ' .  get ( ) , '
-            declaration += 'other . buffer_ ) ) ' + impl + ' = std :: move ( other . ' + impl + ' ) ; '
-            declaration +='else other . ' + function_table + ' . clone_into ( other . ' + impl + ' . get ( ) , '
-            declaration += 'buffer_ , ' + impl + ' ) ;'
+            declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
+            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' .  get ( ) , '
+            declaration += 'other . buffer_ ) ) ' + data.impl_member + ' = std :: move ( other . ' + data.impl_member + ' ) ; '
+            declaration +='else other . ' + data.function_table_member + ' . clone_into ( other . ' + data.impl_member + ' . get ( ) , '
+            declaration += 'buffer_ , ' + data.impl_member + ' ) ;'
         else:
-            declaration += 'if ( ! other . ' + impl + ' ) { reset ( ) ; ' + impl + ' = nullptr ; return * this ; } '
-            declaration += function_table + ' = other . ' + function_table + ' ; '
-            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + impl + ' , other . buffer_ ) ) '
-            declaration += impl + ' = other . ' + impl + ' ; '
-            declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + impl + ' = & buffer_ ; } '
+            declaration += 'if ( ! other . ' + data.impl_member + ' ) { reset ( ) ; ' + data.impl_member + ' = nullptr ; return * this ; } '
+            declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
+            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
+            declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
+            declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + data.impl_member + ' = & buffer_ ; } '
     else:
-        declaration += function_table + ' = other . ' + function_table + ' ; '
-        declaration += impl + ' = other . ' + impl + ' ; '
-    declaration += 'other . ' + impl + ' = nullptr ; '
+        declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
+        declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
+    declaration += 'other . ' + data.impl_member + ' = nullptr ; '
     return declaration + 'return * this ; }'
 
 
-def get_move_operator_for_handle(data, classname, handle=HANDLE):
+def get_move_operator_for_handle(data, classname):
     declaration = classname + ' & operator = ( ' + classname + ' && other ) noexcept '
     if data.small_buffer_optimization:
-        escape_sequence = 'if ( ! other . ' + handle + ' ) { ' + handle + ' = nullptr ; return * this ; }'
-        declaration += '{ reset ( ) ; ' + get_handle_move_assignment_for_small_buffer_optimization(escape_sequence)
+        escape_sequence = 'if ( ! other . ' + data.impl_member + ' ) { ' + data.impl_member + ' = nullptr ; return * this ; }'
+        declaration += '{ reset ( ) ; ' + get_handle_move_assignment_for_small_buffer_optimization(data, escape_sequence)
     else:
-        declaration += '{ ' + handle + ' = std :: move ( other . ' + handle + ' ) ; '
-    return declaration + 'other . ' + handle + ' = nullptr ; return * this ; }'
+        declaration += '{ ' + data.impl_member + ' = std :: move ( other . ' + data.impl_member + ' ) ; '
+    return declaration + 'other . ' + data.impl_member + ' = nullptr ; return * this ; }'
 
 
-def get_move_operator(data, classname, impl=IMPL, function_table=FUNCTION_TABLE):
-    return get_move_operator_for_table(data, classname, impl, function_table) if data.table \
-        else get_move_operator_for_handle(data, classname, impl)
+def get_move_operator(data, classname):
+    return get_move_operator_for_table(data, classname) if data.table \
+        else get_move_operator_for_handle(data, classname)
 
 
 def get_operator_bool_for_member_ptr(member):
@@ -274,25 +272,23 @@ def get_operator_bool_comment(declaration):
     return parser_addition.Comment(comment, declaration)
 
 
-def get_cast(data, member, handle_namespace, const=''):
+def get_cast(data, classname, handle_namespace, const=''):
     const = const and const + ' ' or ''
     declaration = 'template < class T > ' + const + 'T * target ( ) ' + const + 'noexcept '
-    if not ( not data.copy_on_write and data.small_buffer_optimization ) and not data.table:
-        member += ' . get ( )'
 
     if data.table:
          declaration += '{ return type_erasure_vtable_detail :: cast_impl < T > ( '
-         declaration += 'read ( )' if data.copy_on_write else member
+         declaration += 'read ( )' if data.copy_on_write else data.impl_raw_member
          return declaration + ' ) ; }'
     else:
         if data.small_buffer_optimization:
-            return declaration + '{ if ( type_erasure_detail :: is_heap_allocated ( ' + member + ' , buffer_ ) ) ' \
+            return declaration + '{ if ( type_erasure_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) ' \
                                  'return type_erasure_detail :: cast < ' + const + 'T , ' + \
-                                 const + 'HeapAllocatedHandle < T > > ( ' + member + ' ) ; ' \
+                                 const + 'HeapAllocatedHandle < T > > ( ' + data.impl_raw_member + ' ) ; ' \
                                 'return type_erasure_detail :: cast < ' + const + 'T , ' + \
-                                 const + 'StackAllocatedHandle < T > > ( ' + member + ' ) ; }'
+                                 const + 'StackAllocatedHandle < T > > ( ' + data.impl_raw_member + ' ) ; }'
     return declaration + '{ return type_erasure_detail :: cast < ' + const + 'T , ' + \
-           const + handle_namespace + ' :: Handle < T > > ( ' + member + ' ) ; }'
+           const + handle_namespace + ' :: Handle < T , ' + classname + ' > > ( ' + data.impl_raw_member + ' ) ; }'
 
 
 def get_handle_cast_comment(declaration, const=''):
@@ -303,9 +299,9 @@ def get_handle_cast_comment(declaration, const=''):
     return parser_addition.Comment(comment,declaration)
 
 
-def get_handle_interface_function(function):
+def get_handle_interface_function(data, function):
     code = util.concat(function.tokens[:cpp_file_parser.get_declaration_end_index(function.name,function.tokens)],' ')
-    code += ' { assert ( ' + HANDLE + ' ) ; ' + function.return_str + ' ' + HANDLE + ' -> ' + function.name + ' ( '
+    code += ' { assert ( ' + data.impl_member + ' ) ; ' + function.return_str + ' ' + data.impl_member + ' -> ' + function.name + ' ( '
     arguments = cpp_file_parser.get_function_arguments(function)
     for arg in arguments:
         code += arg.in_single_function_call()
@@ -316,14 +312,14 @@ def get_handle_interface_function(function):
 
 def get_handle_specialization(data):
     if data.small_buffer_optimization:
-        return 'template < class T , class Buffer , bool HeapAllocated > ' \
-               'struct Handle < std :: reference_wrapper < T > , Buffer , HeapAllocated > : ' \
-               'Handle < T & , Buffer , HeapAllocated > { ' \
+        return 'template < class T , class Interface , class Buffer , bool HeapAllocated > ' \
+               'struct Handle < std :: reference_wrapper < T > , Interface , Buffer , HeapAllocated > : ' \
+               'Handle < T & , Interface , Buffer , HeapAllocated > { ' \
                'Handle ( std :: reference_wrapper < T > ref ) noexcept : ' \
-               'Handle < T & , Buffer , HeapAllocated > ( ref . get ( ) ) { } ' \
+               'Handle < T & , Interface , Buffer , HeapAllocated > ( ref . get ( ) ) { } ' \
                '};'
-    return 'template < typename T > struct Handle < std :: reference_wrapper < T > > : Handle < T & > { ' \
-           'Handle ( std :: reference_wrapper < T > ref ) noexcept : Handle < T & > ( ref . get ( ) ) { } } ;'
+    return 'template < class T , class Interface > struct Handle < std :: reference_wrapper < T > , Interface > : Handle < T & , Interface > { ' \
+           'Handle ( std :: reference_wrapper < T > ref ) noexcept : Handle < T & , Interface > ( ref . get ( ) ) { } } ;'
 
 
 def get_read_function_for_handle(return_type, member):
@@ -331,12 +327,12 @@ def get_read_function_for_handle(return_type, member):
                                          'return * ' + member + ' ; }'
 
 
-def get_read_function_for_table(return_type, member):
-    return return_type + ' read ( ) const noexcept { assert ( ' + member + ' ) ; return ' + member + ' . get ( ) ; }'
+def get_read_function_for_table(data, return_type):
+    return return_type + ' read ( ) const noexcept { assert ( ' + data.impl_member + ' ) ; return ' + data.impl_raw_member + ' ; }'
 
 
 def get_read_function(data, return_type, member):
-    return get_read_function_for_table(return_type, member) if data.table \
+    return get_read_function_for_table(data, return_type) if data.table \
         else get_read_function_for_handle(return_type, member)
 
 
@@ -349,19 +345,19 @@ def get_write_function_for_handle(data, return_type, member):
     return code + 'return * ' + member + ' ; }'
 
 
-def get_write_function_for_table(data, return_type, member, function_table):
+def get_write_function_for_table(data, return_type, member):
     code = return_type + ' write ( ) { if ( ! ' + member + ' . unique ( ) ) '
     if data.small_buffer_optimization:
         code += '{ if ( type_erasure_vtable_detail :: is_heap_allocated ( ' + member + ' . get ( ) , buffer_ ) ) '
-        code += function_table + ' . clone( ' + member + ' . get ( ) , ' + member + ' ) ; '
-        code += 'else ' + function_table + ' . clone_into ( ' + member + ' . get ( ) , buffer_ , ' + member + ' ) ; }'
+        code += data.function_table_member + ' . clone( ' + member + ' . get ( ) , ' + member + ' ) ; '
+        code += 'else ' + data.function_table_member + ' . clone_into ( ' + member + ' . get ( ) , buffer_ , ' + member + ' ) ; }'
     else:
-        code += function_table + ' . clone ( read ( ) , ' + member + ' ) ; '
+        code += data.function_table_member + ' . clone ( read ( ) , ' + member + ' ) ; '
     return code + 'return ' + member + ' . get ( ) ; }'
 
 
-def get_write_function(data, return_type, member, function_table=FUNCTION_TABLE):
-    return get_write_function_for_table(data, return_type, member, function_table) if data.table \
+def get_write_function(data, return_type, member):
+    return get_write_function_for_table(data, return_type, member) if data.table \
         else get_write_function_for_handle(data, return_type, member)
 
 

@@ -281,12 +281,27 @@ class SimpleToken(object):
         self.spelling = spelling
 
 
+def contains(name, tokens):
+    for token in tokens:
+        if token.spelling == name:
+            return True
+    return False
+
+
 def get_name_size_in_tokens(name):
     if name.startswith('~'):
         return 2
-    if name in ['operator=', 'operator bool']:
+    if name in ['operator=',
+                'operator-',
+                'operator bool',
+                'operator+=',
+                'operator-=',
+                'operator*=',
+                'operator/=',
+                'operator==']:
         return 2
-    if name in ['operator()','operator[]']:
+    if name in ['operator()',
+                'operator[]']:
         return 3
     return 1
 
@@ -377,6 +392,49 @@ def get_alias_from_text(name, text):
     return Alias(name, [SimpleToken(spelling) for spelling in text.split(' ')])
 
 
+def sequence_from_text(text):
+    return [SimpleToken(entry) for entry in text.split(' ')]
+
+
+def contains_sequence(tokens, sub_tokens):
+    if len(sub_tokens) > len(tokens):
+        return False
+    for offset in range(len(tokens) - len(sub_tokens)):
+        found_sequence = True
+        for index in range(len(sub_tokens)):
+            if sub_tokens[index] != tokens[offset + index]:
+                found_sequence = False
+        if found_sequence:
+            return True
+    return False
+
+
+def returns_this(function):
+    remaining_tokens = function.tokens[get_declaration_end_index(function.name, function.tokens):]
+    return contains_sequence(remaining_tokens, sequence_from_text('return * this ;'))
+
+
+def returns_class_ref(classname,function):
+    index, offset = find_function_name(function.name, function.tokens)
+    return util.concat(function.tokens[:index], ' ') in ['const ' + classname + ' & ',
+                                                         classname + ' & ']
+
+
+def get_table_return_type(function):
+    index, offset = find_function_name(function.name, function.tokens)
+    return_type = util.concat(function.tokens[:index], ' ')
+    if return_type in ['const ' + function.classname + ' & ',
+                       function.classname + ' & ']:
+        return 'void '
+    if return_type == function.classname + ' ':
+        return
+
+    if returns_this(function):
+        return 'void '
+
+    return util.concat(function.tokens[:index], ' ')
+
+
 class FunctionArgument(Tokens):
     def is_const(self):
         counter = InTypeCounter()
@@ -445,6 +503,19 @@ def get_function_arguments_in_single_call(function):
     return args_in_single_call
 
 
+def uses_type(function,typename):
+    for token in function.tokens:
+        if token.spelling == typename:
+            return True
+    return False
+
+
+def replace_in_tokens(old_spelling, new_spelling, tokens):
+    for token in tokens:
+        if token.spelling == old_spelling:
+            token.spelling = new_spelling
+
+
 def is_deleted(function):
     return len(function.tokens) > 5 and util.concat(function.tokens[-3:], ' ') == '= delete ; '
 
@@ -465,6 +536,10 @@ def is_const(function):
             return True
         index -= 1
     return False
+
+
+def const_specifier(function):
+    return 'const ' if is_const(function) else ''
 
 
 class Function(Tokens):

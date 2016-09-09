@@ -13,5 +13,9 @@
         int foo() const;
         //! Retrieves something else.
         void set_value(int value);
+        /// In-place summation
+        Fooable& operator+=(const Fooable& other);
+        /** Negation */
+        Fooable operator-( ) const;
     };
 

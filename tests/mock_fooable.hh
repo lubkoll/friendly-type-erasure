@@ -20,6 +20,19 @@ namespace Mock
             value_ = val;
         }
 
+        MockFooable& operator+=(const MockFooable& other)
+        {
+            value_ += other.value_;
+            return *this;
+        }
+
+        MockFooable operator-() const
+        {
+            MockFooable other;
+            other.set_value( -value_ );
+            return other;
+        }
+
     private:
         int value_ = value;
     };

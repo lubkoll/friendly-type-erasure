@@ -77,18 +77,20 @@ def get_inclusion_directives_for_forward_declarations(data, comments):
     return inclusion_directives_for_forward_decl
 
 
-def get_name_for_variable(name):
+def get_function_name_for_type_erasure(name):
     if name == 'operator()':
         return 'call'
     elif name == 'operator=':
         return 'assignment'
-    elif name == 'operator+':
+    elif name == 'operator+=':
         return 'add'
-    elif name == 'operator*':
+    elif name == 'operator*=':
         return 'multiply'
-    elif name == 'operator-':
+    elif name == 'operator-=':
         return 'subtract'
-    elif name == 'operator/':
+    elif name == 'operator-':
+        return 'negate'
+    elif name == 'operator/=':
         return 'divide'
     elif name == 'operator==':
         return 'compare'
