@@ -11,12 +11,14 @@ class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
         self.data = data
         self.scope = scope
 
-    def visit_function(self,function):
+    def visit_function(self,function_):
+        function = copy.deepcopy(function_)
         tokens = function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)]
         index, offset = cpp_file_parser.find_function_name(function.name, tokens)
         cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, tokens[:index])
+        function_name = cpp_file_parser.get_function_name_for_type_erasure(function)
+        code = util.concat(tokens[:index], ' ') + function_name + ' ( '
         cpp_file_parser.replace_in_tokens(function.classname, 'HandleBase', tokens[index:])
-        code = util.concat(tokens[:index], ' ') + util.get_function_name_for_type_erasure(function.name) + ' ( '
         code += cpp_file_parser.const_specifier(function) + self.data.interface_type + ' & '
         for arg in cpp_file_parser.get_function_arguments(function):
             code += ' , ' + arg.in_declaration()
@@ -27,8 +29,7 @@ class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
         if not code.endswith('= 0'):
             code += ' = 0'
         code += ' ;'
-        self.scope.add(cpp_file_parser.get_function_from_text(function.classname,
-                                                              util.get_function_name_for_type_erasure(function.name),
+        self.scope.add(cpp_file_parser.get_function_from_text(function.classname, function_name,
                                                               function.return_str, code))
 
 
@@ -55,7 +56,7 @@ def add_handle_base(data, scope, class_scope):
     scope.add(cpp_file_parser.get_template_struct_from_text(classname, handle_base))
 
     destructor = 'virtual ~ ' + classname + ' ( ) = default ;'
-    scope.add( cpp_file_parser.get_function_from_text(classname, '~'+classname, '', destructor, 'destructor') )
+    scope.add( cpp_file_parser.get_function_from_text(classname, '~' + classname, '', destructor, 'destructor') )
     if data.small_buffer_optimization:
         add_pure_virtual_functions_for_small_buffer_optimization(data, scope, classname)
     else:
@@ -67,11 +68,14 @@ def add_handle_base(data, scope, class_scope):
 
 
 class OverridingFunctionExtractor(PureVirtualFunctionExtractor):
-    def visit_function(self,function):
-        tokens = copy.deepcopy(function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)])
+    def visit_function(self,function_):
+        function = copy.deepcopy(function_)
+        tokens = function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)]
         index, offset = cpp_file_parser.find_function_name(function.name, function.tokens)
-        #cpp_file_parser.replace_in_tokens('HandleBase', self.data.handle_base_type, tokens[index:])
-        code = util.concat(tokens[:index], ' ') + util.get_function_name_for_type_erasure(function.name) + ' ( '
+        cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, tokens[:index])
+        function_name = cpp_file_parser.get_function_name_for_type_erasure(function)
+        code = util.concat(tokens[:index], ' ') + function_name + ' ( '
+        cpp_file_parser.replace_in_tokens(function.classname, 'HandleBase', tokens[index:])
         code += cpp_file_parser.const_specifier(function) + self.data.interface_type + ' & ' + self.data.interface_variable + ' '
         for arg in cpp_file_parser.get_function_arguments(function):
             if 'HandleBase' in arg.type():
@@ -105,13 +109,12 @@ class OverridingFunctionExtractor(PureVirtualFunctionExtractor):
             if arg is not arguments[-1]:
                 code += ' , '
 
-        code += ' ) ;'
+        code += ' ) ; '
         if contains_class_ref:
             code += 'return ' + self.data.interface_variable + ' ;'
         code += ' }'
 
-        self.scope.add(cpp_file_parser.get_function_from_text(function.classname,
-                                                              util.get_function_name_for_type_erasure(function.name),
+        self.scope.add(cpp_file_parser.get_function_from_text(function.classname, function_name,
                                                               function.return_str, code))
 
 

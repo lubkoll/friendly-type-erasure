@@ -2,6 +2,7 @@ import clang_util
 import file_parser
 import util
 import parser_addition
+import re
 from clang.cindex import TypeKind
 
 INCLUDE_GUARD           = 'include guard'
@@ -9,6 +10,7 @@ INCLUSION_DIRECTIVE     = 'include'
 ACCESS_SPECIFIER        = 'access specifier'
 ALIAS                   = 'alias'
 CLASS                   = 'class'
+CLASS_TEMPLATE          = 'class template'
 CONSTRUCTOR             = 'constructor'
 CONSTRUCTOR_TEMPLATE    = 'constructor template'
 ASSIGNMENT_OPERATOR     = 'assignment operator'
@@ -52,6 +54,10 @@ def is_function(entry):
     return entry.type == FUNCTION
 
 
+def is_alias(entry):
+    return entry.type == ALIAS
+
+
 def is_access_specifier(entry):
     return entry.type == ACCESS_SPECIFIER
 
@@ -78,6 +84,9 @@ class ScopeEntry(object):
 
     def __str__(self):
         return self.value
+
+    def __cmp__(self, other):
+        return self.type == other.type and self.value == other.value
 
 
 class Comment(ScopeEntry):
@@ -167,7 +176,6 @@ class Scope(Tokens):
         self.name = name
         self.content = []
         self.open_sub_scope = None
-        self.current_is_forward_declaration = False
         super(Scope, self).__init__(tokens)
 
     def get_name(self):
@@ -175,12 +183,6 @@ class Scope(Tokens):
 
     def get_type(self):
         return self.type
-
-    def skip(self):
-        if self.current_is_forward_declaration:
-            self.current_is_forward_declaration = False
-            return True
-        return False
 
     def add(self, entry):
         if self.open_sub_scope:
@@ -190,15 +192,10 @@ class Scope(Tokens):
         if entry.type in scoped_types:
             self.open_sub_scope = entry
         else:
-            self.current_is_forward_declaration = entry.type == FORWARD_DECLARATION
             self.content.append( entry )
 
     def close(self):
-        if self.skip():
-            return
         if self.open_sub_scope:
-            if self.open_sub_scope.skip():
-                return
             if self.open_sub_scope.open_sub_scope:
                 self.open_sub_scope.close()
             else:
@@ -281,6 +278,15 @@ class SimpleToken(object):
         self.spelling = spelling
 
 
+def same_tokens(tokens, other_tokens):
+    if len(tokens) != len(other_tokens):
+        return False
+    for i in range(len(tokens)):
+        if tokens[i].spelling != other_tokens[i].spelling:
+            return False
+    return True
+
+
 def contains(name, tokens):
     for token in tokens:
         if token.spelling == name:
@@ -292,13 +298,16 @@ def get_name_size_in_tokens(name):
     if name.startswith('~'):
         return 2
     if name in ['operator=',
+                'operator+',
                 'operator-',
                 'operator bool',
                 'operator+=',
                 'operator-=',
                 'operator*=',
                 'operator/=',
-                'operator==']:
+                'operator==',
+                'operator^',
+                'operator*']:
         return 2
     if name in ['operator()',
                 'operator[]']:
@@ -433,6 +442,38 @@ def get_table_return_type(function):
         return 'void '
 
     return util.concat(function.tokens[:index], ' ')
+
+
+def get_function_name_for_tokens(name):
+    if 'operator' in name:
+        return 'operator ' + name[8:]
+    return name
+
+
+def get_function_name_for_type_erasure(function):
+    arg_extension = ''
+    args = get_function_arguments(function)
+    for arg in args:
+        arg_extension += '_' + arg.type()
+    arg_extension = arg_extension.replace('&','_ref').replace('*','_ptr').replace(' ','_')
+    arg_extension = re.sub(r'<|>|\[|\]\(|\)\{\}', '', arg_extension)
+    if function.name == 'operator()':
+        return 'call' + arg_extension
+    elif function.name == 'operator=':
+        return 'assignment' + arg_extension
+    elif function.name == 'operator+=':
+        return 'add' + arg_extension
+    elif function.name == 'operator*=':
+        return 'multiply' + arg_extension
+    elif function.name == 'operator-=':
+        return 'subtract' + arg_extension
+    elif function.name == 'operator-':
+        return 'negate' + arg_extension
+    elif function.name == 'operator/=':
+        return 'divide' + arg_extension
+    elif function.name == 'operator==':
+        return 'compare' + arg_extension
+    return function.name
 
 
 class FunctionArgument(Tokens):
@@ -630,17 +671,21 @@ class CppFileParser(file_parser.FileProcessor):
 
     def process_open_class(self, data, cursor):
         if clang_util.get_tokens(data.tu, cursor)[2].spelling == clang_util.semicolon:
-            self.scope.add(ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu, cursor)[:3], ' ')))
+            self.scope.add(Class(data.current_struct.spelling, clang_util.get_tokens(data.tu, cursor)[:3]))
+#            self.scope.add(ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu, cursor)[:3], ' ')))
         else:
             self.scope.add(Class(data.current_struct.spelling, clang_util.get_tokens(data.tu, cursor)))
 
     def process_open_struct(self, data, cursor):
         if clang_util.get_tokens(data.tu, cursor)[2].spelling == clang_util.semicolon:
-            self.scope.add(ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu, cursor)[:3], ' ')))
+            self.scope.add(Struct(data.current_struct.spelling, clang_util.get_tokens(data.tu, cursor)[:3]))
+#            self.scope.add(ForwardDeclaration(util.concat(clang_util.get_tokens(data.tu, cursor)[:3], ' ')))
         else:
             self.scope.add(Struct(data.current_struct.spelling, clang_util.get_tokens(data.tu, cursor)))
 
     def process_close_class(self):
+        if self.scope.get_open_scope().get_type() == NAMESPACE:
+            return
         self.scope.close()
 
     def process_function(self, data, cursor):
@@ -648,11 +693,19 @@ class CppFileParser(file_parser.FileProcessor):
         if data.current_struct.spelling:
             classname = data.current_struct.spelling
         current_scope = self.scope.get_open_scope()
+        
         tokens = clang_util.get_tokens(data.tu, cursor)
         tokens = tokens[:get_body_end_index(cursor.spelling, tokens)]
         if current_scope.get_tokens() and not tokens[-1].spelling == clang_util.semicolon:
             tokens = clang_util.get_all_tokens(tokens, current_scope.get_tokens())
-        self.scope.add(Function(classname, cursor.spelling, cursor.result_type.kind != TypeKind.VOID and 'return ' or '', tokens))
+
+        function_type = FUNCTION
+        if clang_util.is_function_template(cursor.kind):
+            function_type = FUNCTION_TEMPLATE
+        self.scope.add(Function(classname, cursor.spelling, cursor.result_type.kind != TypeKind.VOID and 'return ' or '', tokens, function_type))
+
+    def process_function_template(self, data, cursor):
+        self.process_function(data, cursor)
 
     def process_constructor(self, data, cursor):
         classname = ''
@@ -890,6 +943,22 @@ def remove_inclusion_directives(main_scope):
     main_scope.content = new_scope
 
 
+def remove_duplicate_inclusion_directives(main_scope):
+    new_scope = []
+    for entry in main_scope.content:
+        if is_inclusion_directive(entry):
+            in_new_scope = False
+            for new_entry in new_scope:
+                if is_inclusion_directive(new_entry) and new_entry.value == entry.value:
+                    in_new_scope = True
+                    break
+            if not in_new_scope:
+                new_scope.append(entry)
+        else:
+            new_scope.append(entry)
+    main_scope.content = new_scope
+
+
 def prepend_inclusion_directives(main_scope, inclusion_directives):
     for inclusion_directive in reversed(inclusion_directives):
         main_scope.content.insert(0, inclusion_directive)
@@ -927,9 +996,5 @@ def add_comments(scope, comments):
             add_comment(new_content, entry.get_declaration(), comments)
         elif entry.type == ALIAS:
             add_comment(new_content, util.concat(entry.tokens, ' '), comments)
-#        else:
-#            comment = util.get_comment(comments, entry.value)
-#            if comment:
-#                new_content.append(Comment(comment))
         new_content.append(entry)
     scope.content = new_content

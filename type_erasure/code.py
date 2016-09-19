@@ -163,15 +163,17 @@ def get_copy_constructor(data, classname):
 def get_move_constructor_for_table(data, classname):
     declaration = classname + ' ( ' + classname + ' && other ) noexcept : '
     declaration += data.function_table_member + ' ( other . ' + data.function_table_member + ' ) '
+    if not data.no_rtti:
+        declaration += ', type_id_ ( other . type_id_ ) '
     if data.small_buffer_optimization:
         if data.copy_on_write:
-            declaration += '{ if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' . get ( ) , '
+            declaration += '{ if ( type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' . get ( ) , '
             declaration += 'other . buffer_ ) ) ' + data.impl_member + ' = std :: move ( other . ' + data.impl_member + ' ) ;'
             declaration += 'else other . ' + data.function_table_member + ' . clone_into ( other . ' + data.impl_member + ' . get ( ) , '
             return declaration + ' buffer_ , ' + data.impl_member + ' ) ; other . ' + data.impl_member + ' = nullptr ; }'
         else:
             declaration += '{ if ( ! other . ' + data.impl_member + ' ) { reset ( ) ; ' + data.impl_member + ' = nullptr ; return ; } '
-            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
+            declaration += 'if ( type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
             declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
             declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + data.impl_member + ' = & buffer_ ; } '
             return declaration + 'other . ' + data.impl_member + ' = nullptr ; }'
@@ -207,6 +209,8 @@ def get_copy_operator_for_handle(data, classname):
 def get_copy_operator_for_table(data, classname):
     declaration = classname + ' & operator = ( const ' + classname + ' & other ) { '
     declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
+    if not data.no_rtti:
+        declaration += 'type_id_ = other . type_id_ ; '
     if data.small_buffer_optimization:
         if data.copy_on_write:
             declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
@@ -214,7 +218,7 @@ def get_copy_operator_for_table(data, classname):
             declaration += data.impl_member + ' = other . clone_into ( buffer_ ) ; '
     else:
         declaration += data.impl_member + ' = other . ' + data.impl_member + ' ? other . ' + data.function_table_member + ' . clone ( other . ' + data.impl_member + ' ) '
-        declaration += ': nullptr ;'
+        declaration += ': nullptr ; '
     return declaration + 'return * this ; }'
 
 
@@ -228,14 +232,14 @@ def get_move_operator_for_table(data, classname):
     if data.small_buffer_optimization:
         if data.copy_on_write:
             declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
-            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' .  get ( ) , '
+            declaration += 'if ( type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' .  get ( ) , '
             declaration += 'other . buffer_ ) ) ' + data.impl_member + ' = std :: move ( other . ' + data.impl_member + ' ) ; '
             declaration +='else other . ' + data.function_table_member + ' . clone_into ( other . ' + data.impl_member + ' . get ( ) , '
             declaration += 'buffer_ , ' + data.impl_member + ' ) ;'
         else:
             declaration += 'if ( ! other . ' + data.impl_member + ' ) { reset ( ) ; ' + data.impl_member + ' = nullptr ; return * this ; } '
             declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
-            declaration += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
+            declaration += 'if ( type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
             declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
             declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + data.impl_member + ' = & buffer_ ; } '
     else:
@@ -277,9 +281,14 @@ def get_cast(data, classname, handle_namespace, const=''):
     declaration = 'template < class T > ' + const + 'T * target ( ) ' + const + 'noexcept '
 
     if data.table:
-         declaration += '{ return type_erasure_vtable_detail :: cast_impl < T > ( '
-         declaration += 'read ( )' if data.copy_on_write else data.impl_raw_member
-         return declaration + ' ) ; }'
+        if data.no_rtti:
+            declaration += '{ return type_erasure_table_detail :: cast_impl < T > ( '
+            declaration += 'read ( )' if data.copy_on_write else data.impl_raw_member
+            return declaration + ' ) ; }'
+        else:
+            declaration += '{ return type_erasure_table_detail :: dynamic_cast_impl < T > ( type_id_ , '
+            declaration += 'read ( )' if data.copy_on_write else data.impl_raw_member
+            return declaration + ' ) ; }'
     else:
         if data.small_buffer_optimization:
             return declaration + '{ if ( type_erasure_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) ' \
@@ -348,7 +357,7 @@ def get_write_function_for_handle(data, return_type, member):
 def get_write_function_for_table(data, return_type, member):
     code = return_type + ' write ( ) { if ( ! ' + member + ' . unique ( ) ) '
     if data.small_buffer_optimization:
-        code += '{ if ( type_erasure_vtable_detail :: is_heap_allocated ( ' + member + ' . get ( ) , buffer_ ) ) '
+        code += '{ if ( type_erasure_table_detail :: is_heap_allocated ( ' + member + ' . get ( ) , buffer_ ) ) '
         code += data.function_table_member + ' . clone( ' + member + ' . get ( ) , ' + member + ' ) ; '
         code += 'else ' + data.function_table_member + ' . clone_into ( ' + member + ' . get ( ) , buffer_ , ' + member + ' ) ; }'
     else:

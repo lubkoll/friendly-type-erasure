@@ -60,4 +60,7 @@ def write_file(data):
     parser = file_parser.GenericFileParser(processor, data)
     parser.parse()
     scope = get_detail_file(data, processor.scope)
-    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file), to_string.Visitor(), not data.no_warning_header)
+    cpp_file_parser.remove_duplicate_inclusion_directives(scope)
+    if data.table:
+        scope.visit(table_detail.SortTable())
+    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file), to_string.Visitor(short_entries=[cpp_file_parser.ALIAS]), not data.no_warning_header)

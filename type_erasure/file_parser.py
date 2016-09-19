@@ -94,6 +94,9 @@ class GenericFileParser(object):
             return self.parse_opening_class(cursor)
         elif clang_util.is_function(cursor.kind):
             return self.parse_function(cursor)
+        elif clang_util.is_function_template(cursor.kind):
+            self.processor.process_function_template(self.data, cursor)
+            return Continue
         elif clang_util.is_type_alias(kind) or clang_util.is_typedef(kind):
             self.processor.process_type_alias(self.data,cursor)
 
@@ -180,6 +183,9 @@ class FileProcessor(object):
         pass
 
     def process_function(self, data, cursor):
+        pass
+
+    def process_function_template(self, data, cursor):
         pass
 
     def process_forward_declaration(self, data, cursor):

@@ -2,8 +2,10 @@
 
 #include <cassert>
 #include <memory>
+#include <typeinfo>
+#include <type_traits>
 
-namespace type_erasure_vtable_detail
+namespace type_erasure_table_detail
 {
     template < class T >
     inline void* clone_impl ( void* impl )
@@ -47,6 +49,15 @@ namespace type_erasure_vtable_detail
     {
         assert(impl);
         if( impl )
+            return static_cast<T*>( impl );
+        return nullptr;
+    }
+
+    template < class T >
+    inline T* dynamic_cast_impl( const std::size_t& type_id, void* impl ) noexcept
+    {
+        assert(impl);
+        if( impl && type_id == typeid( T ).hash_code() )
             return static_cast<T*>( impl );
         return nullptr;
     }

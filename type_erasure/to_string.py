@@ -3,8 +3,14 @@ import cpp_file_parser
 
 
 class Visitor(cpp_file_parser.Visitor):
+    def __init__(self, short_entries=[]):
+        self.short_entries = short_entries
+
     def visit(self,visited):
         return str(visited) + '\n'
+
+    def visit_alias(self,alias):
+        return util.concat(alias.tokens, ' ') + '\n' + ('' if cpp_file_parser.ALIAS in self.short_entries else '\n')
 
     def visit_class(self,class_object):
         code = ''
@@ -16,27 +22,27 @@ class Visitor(cpp_file_parser.Visitor):
         code += '\n{\n'
         for entry in class_object.content:
             code += entry.visit(self)
-        code += '};\n\n'
-        return code
+        code += '};\n'
+        return code + ('' if cpp_file_parser.CLASS in self.short_entries else '\n')
 
     def visit_template_class(self,template_class):
-        code = util.concat(template_class.tokens,' ') + '{\n'
+        code = util.concat(template_class.tokens,' ') + '{ '
         for entry in template_class.content:
             code += entry.visit(self)
-        return code + '};\n\n'
+        return code + '};\n' + ('' if cpp_file_parser.CLASS_TEMPLATE in self.short_entries else '\n')
 
     def visit_namespace(self,namespace):
         str = ''
         if namespace.name != 'global':
-            str = '\nnamespace ' + namespace.name + '\n{\n'
+            str = '\nnamespace ' + namespace.name + '\n{'
         for entry in namespace.content:
             str += entry.visit(self)
         if namespace.name != 'global':
-            str += '}\n'
-        return str
+            str += '}'
+        return str + ('' if cpp_file_parser.NAMESPACE in self.short_entries else '\n')
 
     def visit_inclusion_directive(self,inclusion_directive):
-        return '#include ' + inclusion_directive.value + '\n'
+        return '#include ' + inclusion_directive.value + ('' if cpp_file_parser.INCLUSION_DIRECTIVE in self.short_entries else '\n')
 
     def visit_access_specifier(self,access_specifier):
         return access_specifier.value + ':\n'
@@ -49,18 +55,15 @@ class Visitor(cpp_file_parser.Visitor):
 
 
 class VisitorForHeaderFile(Visitor):
-    def visit_alias(self,alias):
-        return util.concat(alias.tokens, ' ') + '\n'
-
     def visit_static_variable(self,variable):
         return self.visit(variable)
 
     def visit_function(self, function):
         code = function.get_declaration() + ';\n'
-        return code + '\n'
+        return code + ('' if cpp_file_parser.FUNCTION in self.short_entries else '\n')
 
     def visit_template_function(self, function):
-       return function.get_in_place_definition() + '\n'
+       return function.get_in_place_definition() + ('' if cpp_file_parser.FUNCTION_TEMPLATE in self.short_entries else '\n')
 
     def visit_namespace(self, namespace):
         code = ''
@@ -71,8 +74,8 @@ class VisitorForHeaderFile(Visitor):
         for entry in namespace.content:
             code += entry.visit(self)
         if namespace.name != 'global':
-            code += '}\n'
-        return code
+            code += '}'
+        return code + ('' if cpp_file_parser.NAMESPACE in self.short_entries else '\n')
 
     def visit_comment(self,comment):
         first_line = comment.value.comment[0]
@@ -81,14 +84,12 @@ class VisitorForHeaderFile(Visitor):
         else:
             return super(VisitorForHeaderFile,self).visit_comment(comment)
 
-    def visit_alias(self,alias):
-        return str(alias) + '\n\n'
-
 
 class VisitorForSourceFile(Visitor):
-    def __init__(self):
+    def __init__(self, new_line='\n'):
         self.current_class = None
         self.current_class_aliases = []
+        super(VisitorForSourceFile,self).__init__(new_line)
 
     def add_class_prefix_for_nested_types(self, function):
         for token in function.tokens:

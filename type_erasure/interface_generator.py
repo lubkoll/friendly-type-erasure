@@ -153,18 +153,20 @@ def add_private_section(data, scope, detail_namespace, classname):
             function_table_var += ', Buffer'
         function_table_var += '>' + data.function_table_member + ';'
         scope.add(cpp_file_parser.Variable(function_table_var))
+        if not data.no_rtti:
+            scope.add(cpp_file_parser.Variable('std::size_t type_id_;'))
 
         if data.copy_on_write:
             scope.add(cpp_file_parser.Variable('std::shared_ptr<void> ' + data.impl_member + ' = nullptr;'))
         else:
             scope.add(cpp_file_parser.Variable('void* ' + data.impl_member + ' = nullptr;'))
         if data.small_buffer_optimization and not data.copy_on_write:
-            reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' && type_erasure_vtable_detail :: is_heap_allocated ' \
+            reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' && type_erasure_table_detail :: is_heap_allocated ' \
                     '( ' + data.impl_raw_member + ' , buffer_ ) ) ' + data.function_table_member + ' . del ( ' + data.impl_member + ' ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, 'reset', '', reset))
 
             clone_into = 'void * clone_into ( Buffer & buffer ) const { if ( ! ' + data.impl_member + ' ) return nullptr ; '
-            clone_into += 'if ( type_erasure_vtable_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) '
+            clone_into += 'if ( type_erasure_table_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) '
             clone_into += 'return ' + data.function_table_member + ' . clone ( ' + data.impl_member + ' ) ; else '
             clone_into += 'return ' + data.function_table_member + ' . clone_into ( ' + data.impl_member + ' , buffer ) ; }'
             scope.add(cpp_file_parser.get_function_from_text(classname, 'clone_into', 'return ', clone_into))
@@ -218,7 +220,7 @@ class HandleFunctionExtractor(cpp_file_parser.RecursionVisitor):
                 code += 'write ( ) . '
         else:
             code += self.data.impl_member + ' -> '
-        code += util.get_function_name_for_type_erasure(function.name) + ' ( * this '
+        code += cpp_file_parser.get_function_name_for_type_erasure(function) + ' ( * this '
         arguments = cpp_file_parser.get_function_arguments(function)
         for arg in arguments:
             code += ' , '
@@ -245,21 +247,23 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
     def __init__(self, data, classname, detail_namespace):
         constructor = code.get_constructor_from_value_declaration(classname) + ' : ' + data.function_table_member + ' ( { '
         if not data.copy_on_write:
-            constructor += '& type_erasure_vtable_detail :: delete_impl < ' + code.get_decayed('T') + ' > , '
-            constructor += '& type_erasure_vtable_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
+            constructor += '& type_erasure_table_detail :: delete_impl < ' + code.get_decayed('T') + ' > , '
+            constructor += '& type_erasure_table_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
             if data.small_buffer_optimization:
-                constructor += ' , & type_erasure_vtable_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
+                constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
         else:
-            constructor += '& type_erasure_vtable_detail :: clone_into_shared_ptr < ' + code.get_decayed('T') + ' >'
+            constructor += '& type_erasure_table_detail :: clone_into_shared_ptr < ' + code.get_decayed('T') + ' >'
             if data.small_buffer_optimization:
-                constructor += ' , & type_erasure_vtable_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
+                constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
         self.constructor = constructor
         self.classname = classname
 
         constructor_end = ' } ) '
+        if not data.no_rtti:
+            constructor_end += ', type_id_ ( typeid ( ' + code.get_decayed('T') + ' ) . hash_code ( ) ) '
         if data.small_buffer_optimization:
-            constructor_end += ' , ' + data.impl_member + ' ( nullptr ) { '
-            constructor_end += ' if ( sizeof ( ' + code.get_decayed('T') + ' ) <= sizeof ( Buffer ) ) '
+            constructor_end += ', ' + data.impl_member + ' ( nullptr ) { '
+            constructor_end += 'if ( sizeof ( ' + code.get_decayed('T') + ' ) <= sizeof ( Buffer ) ) '
             constructor_end += '{ new ( & buffer_ ) ' + code.get_decayed('T') + ' ( std :: forward < T > ( value ) ) ; '
             if data.copy_on_write:
                 constructor_end += data.impl_member + ' = std :: shared_ptr < ' + code.get_decayed('T') + ' > ( '
@@ -286,7 +290,7 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
 
     def visit_function(self,function):
         self.constructor += ' , & ' + self.detail_namespace + ' :: execution_wrapper < ' + self.classname + ' , ' + code.get_decayed('T') + ' > '
-        self.constructor += ' :: ' + util.get_function_name_for_type_erasure(function.name)
+        self.constructor += ' :: ' + cpp_file_parser.get_function_name_for_type_erasure(function)
 
 
 class WrapperFunctionExtractor(HandleFunctionExtractor):
@@ -301,14 +305,13 @@ class WrapperFunctionExtractor(HandleFunctionExtractor):
             return
         code = function.get_declaration()
         code += '{ assert ( ' + self.data.impl_member + ' ) ; '
-        code += function.return_str + self.data.function_table_member + ' . ' + util.get_function_name_for_type_erasure(function.name)
+        code += function.return_str + self.data.function_table_member + ' . ' + cpp_file_parser.get_function_name_for_type_erasure(function)
         code += ' ( * this , ' + member + ' '
-#        arguments = cpp_file_parser.get_function_arguments_in_single_call(function)
         arguments = cpp_file_parser.get_function_arguments(function)
         for arg in arguments:
             code += ' , '
             if cpp_file_parser.contains(function.classname, arg.tokens):
-                code += 'other . ' + self.data.impl_raw_member
+                code += arg.name() + ' . ' + self.data.impl_raw_member
             else:
                 code += arg.in_single_function_call()
         code += ' ) ; }'
@@ -353,16 +356,21 @@ def get_interface_file(data, interface_scope, for_header_file=True):
     if for_header_file:
         if data.table:
             main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
-            main_scope.add(cpp_file_parser.InclusionDirective('"' + data.util_include_path + '/vtable_util.hh"'))
+            main_scope.add(cpp_file_parser.InclusionDirective('"' + data.util_include_path + '/table_util.hh"'))
         else:
             main_scope.add(cpp_file_parser.InclusionDirective('"' + os.path.join(relative_folder,data.detail_file) + '"'))
         if data.small_buffer_optimization:
             main_scope.add(cpp_file_parser.InclusionDirective('<array>'))
         if not data.copy_on_write:
             main_scope.add(cpp_file_parser.InclusionDirective('<memory>'))
-    else:
-        main_scope.add(cpp_file_parser.InclusionDirective('"' + data.interface_include_path + '"'))
+
     get_interface_file_impl(data, main_scope, interface_scope)
+
+    if not for_header_file:
+        cpp_file_parser.remove_inclusion_directives(main_scope)
+        cpp_file_parser.prepend_inclusion_directives(main_scope,
+                                                     [cpp_file_parser.InclusionDirective('"' + data.interface_include_path + '"')])
+
     return main_scope
 
 

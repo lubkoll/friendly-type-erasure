@@ -3,8 +3,15 @@ project(type_erasure_test)
 
 add_definitions(-std=c++11)
 
-find_package(GTest REQUIRED)
-include_directories(. ${GTEST_INCLUDE_DIRS})
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  include(conanbuildinfo.cmake)
+  conan_basic_setup()
+  set(GTEST_LIBS ${CONAN_LIBS})
+else(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  find_package(GTest REQUIRED)
+  include_directories(. ${GTEST_INCLUDE_DIRS})
+  set(GTEST_LIBS ${GTEST_LIBRARIES})
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 
 aux_source_directory(. SRC_LIST)
 # inheritance-based type erasure
@@ -29,7 +36,7 @@ aux_source_directory(gen/vtable_sbo_cow_header_only SRC_LIST)
 aux_source_directory(gen/test SRC_LIST)
 
 add_executable(unit_tests ${SRC_LIST})
-target_link_libraries(unit_tests ${GTEST_LIBRARIES} pthread)
+target_link_libraries(unit_tests ${GTEST_LIBS} pthread)
 
 include(CTest)
 enable_testing()

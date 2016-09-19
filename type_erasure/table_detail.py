@@ -27,7 +27,7 @@ class AddFunctionPointers(cpp_file_parser.RecursionVisitor):
     def visit_function(self,function_):
         function = copy.deepcopy(function_)
 
-        name = util.get_function_name_for_type_erasure(function.name)
+        name = cpp_file_parser.get_function_name_for_type_erasure(function)
         function_pointer_alias = name + '_function'
 
         function_pointer_alias_definition = 'using ' + function_pointer_alias + ' = '
@@ -62,7 +62,7 @@ class AddFunctionWrappers(cpp_file_parser.RecursionVisitor):
 
     def visit_function(self,function_):
         function = copy.deepcopy(function_)
-        name = util.get_function_name_for_type_erasure(function.name)
+        name = cpp_file_parser.get_function_name_for_type_erasure(function)
         index, offset = cpp_file_parser.find_function_name(function.name, function.tokens)
         cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, function.tokens[:index])
         arguments = copy.deepcopy(cpp_file_parser.get_function_arguments(function))
@@ -152,6 +152,22 @@ def add_table(data, scope, class_scope):
     # interface-related function pointers
     class_scope.visit(AddFunctionPointers(data, scope))
     scope.close()
+
+
+class SortTable(cpp_file_parser.RecursionVisitor):
+    def visit_class(self,class_object):
+        aliases = []
+        variables = []
+        for entry in class_object.content:
+            aliases.append(entry) if cpp_file_parser.is_alias(entry) else variables.append(entry)
+
+        class_object.content = aliases
+        if class_object.content:
+            class_object.content.append(cpp_file_parser.Separator())
+        class_object.content.extend(variables)
+
+    def visit_template_class(self, class_object):
+        self.visit_class(class_object)
 
 
 def add_execution_wrapper(data, scope, class_scope):

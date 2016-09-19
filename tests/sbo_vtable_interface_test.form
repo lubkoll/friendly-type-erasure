@@ -346,8 +346,8 @@ TEST( Test%namespace_name%%class_name%, ConstCast_SmallObject )
 {
     const %class_name% fooable = Mock%class_name%();
 
+    EXPECT_TRUE( fooable.target<int>() == nullptr );
     ASSERT_FALSE( fooable.target<Mock%class_name%>() == nullptr );
-
     EXPECT_EQ( fooable.target<Mock%class_name%>()->foo(), Mock::value );
 }
 
@@ -355,8 +355,8 @@ TEST( Test%namespace_name%%class_name%, ConstCast_LargeObject )
 {
     const %class_name% fooable = MockLarge%class_name%();
 
+    EXPECT_TRUE( fooable.target<int>() == nullptr );
     ASSERT_FALSE( fooable.target<MockLarge%class_name%>() == nullptr );
-
     EXPECT_EQ( fooable.target<MockLarge%class_name%>()->foo(), Mock::value );
 }
 

@@ -205,7 +205,7 @@ def is_struct(kind):
 
 
 def is_forward_declaration(translation_unit, cursor):
-    if not is_class(cursor.kind):
+    if not is_class(cursor.kind) or is_struct(cursor.kind):
         return False
     return get_class_prefix(translation_unit, cursor)[-1] == ';'
 
@@ -218,6 +218,10 @@ def is_function(kind):
     return kind in [CursorKind.CXX_METHOD,
                     CursorKind.FUNCTION_DECL,
                     CursorKind.CONVERSION_FUNCTION]
+
+
+def is_function_template(kind):
+    return kind == CursorKind.FUNCTION_TEMPLATE
 
 
 def is_template(kind):

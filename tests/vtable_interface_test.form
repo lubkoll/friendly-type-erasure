@@ -209,6 +209,7 @@ TEST( Test%namespace_name%%class_name%, Cast )
 {
     %class_name% fooable = Mock%class_name%();
 
+    EXPECT_TRUE( fooable.target<int>() == nullptr );
     ASSERT_FALSE( fooable.target<Mock%class_name%>() == nullptr );
     EXPECT_EQ( fooable.target<Mock%class_name%>()->foo(), Mock::value );
 }
@@ -217,6 +218,7 @@ TEST( Test%namespace_name%%class_name%, ConstCast )
 {
     const %class_name% fooable = Mock%class_name%();
 
+    EXPECT_TRUE( fooable.target<int>() == nullptr );
     ASSERT_FALSE( fooable.target<Mock%class_name%>() == nullptr );
     EXPECT_EQ( fooable.target<Mock%class_name%>()->foo(), Mock::value );
 }

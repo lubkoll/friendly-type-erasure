@@ -64,6 +64,8 @@ def create_parser():
     parser.add_argument('--include-dir', type=str, required=False,
                         default='',
                         help='specify an additional include directory for libclang')
+    parser.add_argument('--no-rtti', action='store_true',
+                        help='do not use rtti, i.e. use static_cast instead of dynamic_cast')
     return parser
 
 
@@ -84,6 +86,7 @@ class Data:
         self.util_path = args.util_path
         self.util_include_path = args.util_include_path
         self.no_warning_header = args.no_warning_header
+        self.no_rtti = args.no_rtti
         if args.interface_include_path:
             self.interface_include_path = args.interface_include_path
         else:
@@ -157,7 +160,7 @@ def get_data(args):
 
 def copy_utility_file(args):
     if args.table:
-        call(["cp", os.path.join(os.path.dirname(__file__), 'util', 'vtable_util.hh'), args.util_path])
+        call(["cp", os.path.join(os.path.dirname(__file__), 'util', 'table_util.hh'), args.util_path])
     else:
         call(["cp", os.path.join(os.path.dirname(__file__), 'util', 'util.hh'), args.util_path])
 
