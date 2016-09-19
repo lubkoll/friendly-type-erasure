@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import clang_util
 import code
 import cpp_file_parser
 import file_parser
@@ -338,13 +339,14 @@ def add_interface(data, scope, class_scope, detail_namespace):
     scope.close()
 
 
+
 def get_interface_file_impl(data, scope, interface_scope):
     for entry in interface_scope.content:
         if cpp_file_parser.is_namespace(entry):
             scope.add(cpp_file_parser.Namespace(entry.name))
             get_interface_file_impl(data, scope, entry)
             scope.close()
-        elif cpp_file_parser.is_class(entry) or cpp_file_parser.is_struct(entry):
+        elif (cpp_file_parser.is_class(entry) or cpp_file_parser.is_struct(entry)) and not cpp_file_parser.is_forward_declaration(entry):
             add_interface(data, scope, entry, entry.name + data.detail_extension)
         else:
             scope.add(entry)

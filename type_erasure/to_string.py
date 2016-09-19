@@ -15,7 +15,9 @@ class Visitor(cpp_file_parser.Visitor):
     def visit_class(self,class_object):
         code = ''
         for token in class_object.get_tokens():
-            if token.spelling in [';', '{']:
+            if token.spelling == ';':
+                return code + token.spelling
+            if token.spelling == '{':
                 break
             code += token.spelling + ' '
 #        str = class_.type + ' ' + class_.name + '{\n'
@@ -139,6 +141,8 @@ class VisitorForSourceFile(Visitor):
         return ''
 
     def visit_class(self,class_):
+        if cpp_file_parser.is_forward_declaration(class_):
+            return util.concat(class_.tokens, ' ')cd
         str = ''
         self.current_class = class_.get_name( )
         for entry in class_.content:

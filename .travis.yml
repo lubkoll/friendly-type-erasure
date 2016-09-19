@@ -103,6 +103,7 @@ install:
       export PATH=${DEPS_DIR}/cmake/bin:${PATH}
 
     else
+      sudo chown root:wheel /usr/local
       if ! brew ls --version cmake &>/dev/null; then brew install cmake; fi
       brew install python
     fi

@@ -579,6 +579,20 @@ def is_const(function):
     return False
 
 
+def is_forward_declaration(class_object):
+    print "ifd"
+    for token in class_object.tokens:
+        print token.spelling
+        if token.spelling == clang_util.open_brace:
+            print "return false"
+            return False
+        if token.spelling == clang_util.semicolon:
+            print "return true"
+            return True
+    print "final false"
+    return False
+
+
 def const_specifier(function):
     return 'const ' if is_const(function) else ''
 
@@ -693,7 +707,7 @@ class CppFileParser(file_parser.FileProcessor):
         if data.current_struct.spelling:
             classname = data.current_struct.spelling
         current_scope = self.scope.get_open_scope()
-        
+
         tokens = clang_util.get_tokens(data.tu, cursor)
         tokens = tokens[:get_body_end_index(cursor.spelling, tokens)]
         if current_scope.get_tokens() and not tokens[-1].spelling == clang_util.semicolon:
