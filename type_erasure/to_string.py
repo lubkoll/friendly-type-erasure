@@ -142,7 +142,7 @@ class VisitorForSourceFile(Visitor):
 
     def visit_class(self,class_):
         if cpp_file_parser.is_forward_declaration(class_):
-            return util.concat(class_.tokens, ' ')cd
+            return util.concat(class_.tokens, ' ')
         str = ''
         self.current_class = class_.get_name( )
         for entry in class_.content:

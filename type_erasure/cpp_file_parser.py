@@ -580,16 +580,12 @@ def is_const(function):
 
 
 def is_forward_declaration(class_object):
-    print "ifd"
     for token in class_object.tokens:
         print token.spelling
         if token.spelling == clang_util.open_brace:
-            print "return false"
             return False
         if token.spelling == clang_util.semicolon:
-            print "return true"
             return True
-    print "final false"
     return False
 
 
