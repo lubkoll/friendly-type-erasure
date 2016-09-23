@@ -45,12 +45,10 @@ def get_default_default_constructor(classname, noexcept='', constexpr=''):
     return (constexpr and constexpr + ' ' or '') + classname + ' ( ) ' + (noexcept and noexcept + ' ' or '')  + '= default ;'
 
 
-
 def enable_if_not_same_and_compatible(classname, second_type, detail_namespace):
     decayed_type = get_decayed(second_type)
-    return 'typename std :: enable_if < ! std :: is_same < ' + classname + ' , ' + decayed_type + \
-           ' > :: value && ' + detail_namespace + ' :: ' + classname + '_Concept < ' + decayed_type + \
-           ' > :: value > :: type * = nullptr'
+    return 'typename std :: enable_if < ' +  detail_namespace + ' :: ' + classname + 'Concept < ' + classname + \
+           ' , ' + decayed_type + ' > :: value > :: type * = nullptr'
 
 
 def get_constructor_from_value_declaration(classname, detail_namespace=''):
@@ -124,6 +122,8 @@ def get_handle_move_assignment_for_small_buffer_optimization(data, escape_sequen
 def get_copy_constructor_for_table(data, classname):
     declaration = classname + ' ( const ' + classname + ' & other ) : ' + data.function_table_member + ' ( other . '
     declaration += data.function_table_member + ' ) '
+    if not data.no_rtti:
+        declaration += ', type_id_ ( other . type_id_ ) '
     if data.small_buffer_optimization:
         if data.copy_on_write:
             return declaration + ', ' + data.impl_member + ' ( other . ' + data.impl_member + ' ) { }'
@@ -247,6 +247,8 @@ def get_copy_operator(data, classname):
 
 def get_move_operator_for_table(data, classname):
     declaration = classname + ' & operator = ( ' + classname + ' && other ) noexcept { '
+    if not data.no_rtti:
+        declaration += 'type_id_ = other . type_id_ ; '
     if data.small_buffer_optimization:
         if data.copy_on_write:
             declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '

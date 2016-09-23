@@ -120,7 +120,7 @@ class AddFunctionWrappers(cpp_file_parser.RecursionVisitor):
                                                               wrapper))
 
 
-class AddSingleConcepts(cpp_file_parser.RecursionVisitor):
+class AddConcepts(cpp_file_parser.RecursionVisitor):
     def __init__(self, scope):
         self.scope = scope
         self.detail_namespace = 'type_erasure_table_detail'
@@ -132,15 +132,26 @@ class AddSingleConcepts(cpp_file_parser.RecursionVisitor):
         for entry in class_.content:
             entry.visit(self)
 
-        concept_name = class_.get_name() + '_Concept'
-        class_concept = 'template < class T > using ' + concept_name + ' = std :: integral_constant < bool , '
+        concept_name = class_.get_name() + 'Concept'
+        concept_impl_name = concept_name + 'Impl'
+        code = 'template < class T > using ' + concept_impl_name + ' = std :: integral_constant < bool , '
         for concept in self.class_concepts:
-            class_concept += concept + ' < type_erasure_table_detail :: remove_reference_wrapper_t < T > > :: value '
+            code += concept + ' < type_erasure_table_detail :: remove_reference_wrapper_t < T > > :: value '
             if concept is not self.class_concepts[-1]:
-                class_concept += '&& '
-        class_concept += ' > ;'
+                code += '&& '
+        code += ' > ;'
         self.scope.add(cpp_file_parser.Separator())
-        self.scope.add(cpp_file_parser.get_alias_from_text(concept_name, class_concept))
+        self.scope.add(cpp_file_parser.get_alias_from_text(concept_name, code))
+
+        code = 'template < class Impl , class T , bool = std :: is_same < Impl , T > :: value > '
+        code += 'struct ' + concept_name + ' : std :: false_type { } ;'
+        self.scope.add(cpp_file_parser.Separator())
+        self.scope.add(cpp_file_parser.ScopeEntry('plain code', code))
+
+        code = 'template < class Impl , class T > '
+        code += 'struct ' + concept_name + ' < Impl , T , false > : ' + concept_impl_name + ' < T > { } ;'
+        self.scope.add(cpp_file_parser.ScopeEntry('plain code', code))
+
         self.class_concepts = []
         self.classname = ''
 
@@ -230,4 +241,4 @@ def add_execution_wrapper(data, scope, class_scope):
     scope.close()
 
     # concepts
-    class_scope.visit(AddSingleConcepts(scope))
+    class_scope.visit(AddConcepts(scope))
