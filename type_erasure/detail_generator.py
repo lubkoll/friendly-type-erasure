@@ -43,8 +43,9 @@ def get_detail_file(data, interface_scope):
     if not data.table:
         main_scope.add( cpp_file_parser.InclusionDirective('<type_traits>') )
         main_scope.add( cpp_file_parser.InclusionDirective('<utility>') )
-        util_include_dir = data.util_include_path + '/' if data.util_include_path != data.detail_folder else ''
-        main_scope.add( cpp_file_parser.InclusionDirective('<' + os.path.join(util_include_dir,'util.hh') + '>') )
+        main_scope.add( cpp_file_parser.InclusionDirective('<' + os.path.join(data.util_include_path,'util.hh') + '>') )
+    else:
+        main_scope.add( cpp_file_parser.InclusionDirective('<' + os.path.join(data.util_include_path,'table_util.hh') + '>') )
 
     comments = parser_addition.extract_comments(data.file)
     inclusion_directives_for_forward_decl = util.get_inclusion_directives_for_forward_declarations(data, comments)

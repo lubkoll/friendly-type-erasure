@@ -32,9 +32,11 @@ def get_static_value_check(first_type, second_type):
     return 'typename std :: enable_if < std :: is_same < ' + first_type + ' , ' + get_decayed(second_type) + \
            ' > :: value > :: type * = nullptr'
 
+
 def enable_if_not_same(first_type, second_type):
     return 'typename std :: enable_if < ! std :: is_same < ' + first_type + ' , ' + get_decayed(second_type) + \
            ' > :: value > :: type * = nullptr'
+
 
 noexcept_if_nothrow_constructible = 'noexcept ( type_erasure_detail :: is_nothrow_constructible < U > ( ) )'
 
@@ -43,7 +45,18 @@ def get_default_default_constructor(classname, noexcept='', constexpr=''):
     return (constexpr and constexpr + ' ' or '') + classname + ' ( ) ' + (noexcept and noexcept + ' ' or '')  + '= default ;'
 
 
-def get_constructor_from_value_declaration(classname):
+
+def enable_if_not_same_and_compatible(classname, second_type, detail_namespace):
+    decayed_type = get_decayed(second_type)
+    return 'typename std :: enable_if < ! std :: is_same < ' + classname + ' , ' + decayed_type + \
+           ' > :: value && ' + detail_namespace + ' :: ' + classname + '_Concept < ' + decayed_type + \
+           ' > :: value > :: type * = nullptr'
+
+
+def get_constructor_from_value_declaration(classname, detail_namespace=''):
+    if detail_namespace:
+        return 'template < typename T , ' + enable_if_not_same_and_compatible(classname, 'T',
+                                                                              detail_namespace) + ' > ' + classname + ' ( T && value ) '
     return 'template < typename T , ' + enable_if_not_same(classname, 'T') + ' > ' + classname + ' ( T && value ) '
 
 
@@ -64,8 +77,13 @@ def get_handle_constructor(data, classname, handle_namespace):
     return constructor
 
 
-def get_assignment_from_value(data, classname, handle_namespace):
-    code = 'template < typename T , ' + enable_if_not_same(classname, 'T') + ' > '
+def get_assignment_from_value(data, classname, detail_namespace):
+    code = 'template < typename T , '
+    if data.table:
+        code += enable_if_not_same_and_compatible(classname, 'T', detail_namespace)
+    else:
+        code += enable_if_not_same(classname, 'T')
+    code += ' > '
     code += classname + ' &  operator= ( T && value ) { '
 
     if data.table:
@@ -81,7 +99,7 @@ def get_assignment_from_value(data, classname, handle_namespace):
             code += data.impl_member + ' = '
         else:
             code += '' + data.impl_member + ' . reset ( '
-        code += get_generator(data, handle_namespace + ' :: Handle < ' + get_decayed('T') + ' , ' + classname + ' >  ')
+        code += get_generator(data, detail_namespace + ' :: Handle < ' + get_decayed('T') + ' , ' + classname + ' >  ')
         code += ' ( std :: forward < T > ( value ) ) '
         if not data.copy_on_write:
             code += ') '

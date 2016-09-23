@@ -120,6 +120,52 @@ class AddFunctionWrappers(cpp_file_parser.RecursionVisitor):
                                                               wrapper))
 
 
+class AddSingleConcepts(cpp_file_parser.RecursionVisitor):
+    def __init__(self, scope):
+        self.scope = scope
+        self.detail_namespace = 'type_erasure_table_detail'
+        self.classname = ''
+        self.class_concepts = []
+
+    def visit_class(self,class_):
+        self.classname = class_.get_name()
+        for entry in class_.content:
+            entry.visit(self)
+
+        concept_name = class_.get_name() + '_Concept'
+        class_concept = 'template < class T > using ' + concept_name + ' = std :: integral_constant < bool , '
+        for concept in self.class_concepts:
+            class_concept += concept + ' < type_erasure_table_detail :: remove_reference_wrapper_t < T > > :: value '
+            if concept is not self.class_concepts[-1]:
+                class_concept += '&& '
+        class_concept += ' > ;'
+        self.scope.add(cpp_file_parser.Separator())
+        self.scope.add(cpp_file_parser.get_alias_from_text(concept_name, class_concept))
+        self.class_concepts = []
+        self.classname = ''
+
+    def visit_function(self, function):
+        function_name_for_te =  cpp_file_parser.get_function_name_for_type_erasure(function)
+        try_name = 'TryMemFn_' + function_name_for_te
+        try_code = 'template < class T > using ' + try_name
+        try_code += ' = decltype ( std :: declval < T > ( ) . ' + function.name + ' ( '
+        args = cpp_file_parser.get_function_arguments(function)
+        for arg in args:
+            try_code += ' std :: declval < ' + arg.decayed_type().replace(self.classname,'T') + ' > ( ) '
+            if arg is not args[-1]:
+                try_code += ', '
+        try_code += ' )  ) ;'
+        self.scope.add(cpp_file_parser.get_alias_from_text(try_name, try_code))
+
+        has_name = 'HasMemFn_' + function_name_for_te
+        template = 'template < class T , class = void > struct ' + has_name + ' : std :: false_type { } ;'
+        self.scope.add(cpp_file_parser.ScopeEntry('template struct', template))
+        check = self.detail_namespace + ' :: voider < ' + try_name + ' < T > > '
+        specialization = 'template < class T > struct ' + has_name + ' < T , ' + check + ' > : std :: true_type { } ;'
+        self.scope.add(cpp_file_parser.ScopeEntry('template specialization', specialization))
+        self.class_concepts.append(has_name)
+
+
 def add_table(data, scope, class_scope):
     function_table = 'template < class ' + data.interface_type
     if data.small_buffer_optimization:
@@ -182,3 +228,6 @@ def add_execution_wrapper(data, scope, class_scope):
     scope.add(cpp_file_parser.get_template_struct_from_text('execution_wrapper', execution_wrapper))
     class_scope.visit(AddFunctionWrappers(data, scope, for_reference_wrapper=True))
     scope.close()
+
+    # concepts
+    class_scope.visit(AddSingleConcepts(scope))

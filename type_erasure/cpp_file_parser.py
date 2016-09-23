@@ -455,8 +455,10 @@ def get_function_name_for_type_erasure(function):
     args = get_function_arguments(function)
     for arg in args:
         arg_extension += '_' + arg.type()
-    arg_extension = arg_extension.replace('&','_ref').replace('*','_ptr').replace(' ','_')
+    arg_extension = arg_extension.replace('&', '_ref').replace('*', '_ptr').replace(' ', '_')
     arg_extension = re.sub(r'<|>|\[|\]\(|\)\{\}', '', arg_extension)
+    arg_extension = arg_extension.replace('__','_')
+    arg_extension = arg_extension[:-1] if arg_extension.endswith('_') else arg_extension
     if function.name == 'operator()':
         return 'call' + arg_extension
     elif function.name == 'operator=':
@@ -488,6 +490,9 @@ class FunctionArgument(Tokens):
 
     def type(self):
         return util.concat(self.tokens[:get_name_index(self)], ' ')
+
+    def decayed_type(self):
+        return self.type().replace('const ', '').replace('& ','').replace(' ','')
 
     def is_rvalue(self):
         last_type_token = self.tokens[get_name_index(self) - 1]
@@ -581,7 +586,6 @@ def is_const(function):
 
 def is_forward_declaration(class_object):
     for token in class_object.tokens:
-        print token.spelling
         if token.spelling == clang_util.open_brace:
             return False
         if token.spelling == clang_util.semicolon:

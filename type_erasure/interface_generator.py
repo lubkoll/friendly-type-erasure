@@ -246,7 +246,7 @@ def get_private_base_class(classname, data):
 
 class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
     def __init__(self, data, classname, detail_namespace):
-        constructor = code.get_constructor_from_value_declaration(classname) + ' : ' + data.function_table_member + ' ( { '
+        constructor = code.get_constructor_from_value_declaration(classname, detail_namespace) + ' : ' + data.function_table_member + ' ( { '
         if not data.copy_on_write:
             constructor += '& type_erasure_table_detail :: delete_impl < ' + code.get_decayed('T') + ' > , '
             constructor += '& type_erasure_table_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
@@ -337,7 +337,6 @@ def add_interface(data, scope, class_scope, detail_namespace):
 
     add_private_section(data, scope, detail_namespace, class_scope.get_name())
     scope.close()
-
 
 
 def get_interface_file_impl(data, scope, interface_scope):
