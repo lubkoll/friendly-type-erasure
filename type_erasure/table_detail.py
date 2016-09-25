@@ -198,13 +198,14 @@ def add_table(data, scope, class_scope):
         delete_function = 'using delete_function = void ( * ) ( void * ) ;'
         scope.add(cpp_file_parser.get_alias_from_text('delete_function', delete_function))
         scope.add(cpp_file_parser.Variable('delete_function del;'))
-        clone_function = 'using clone_function = void * ( * ) ( void * ) ;'
-        scope.add(cpp_file_parser.get_alias_from_text('clone_function', clone_function))
-        scope.add(cpp_file_parser.Variable('clone_function clone;'))
-        if data.small_buffer_optimization:
-            clone_into_function = 'using clone_into_function = void * ( * ) ( void * , Buffer & ) ;'
-            scope.add(cpp_file_parser.get_alias_from_text('clone_into_function', clone_into_function))
-            scope.add(cpp_file_parser.Variable('clone_into_function clone_into;'))
+        if not data.non_copyable:
+            clone_function = 'using clone_function = void * ( * ) ( void * ) ;'
+            scope.add(cpp_file_parser.get_alias_from_text('clone_function', clone_function))
+            scope.add(cpp_file_parser.Variable('clone_function clone;'))
+            if data.small_buffer_optimization:
+                clone_into_function = 'using clone_into_function = void * ( * ) ( void * , Buffer & ) ;'
+                scope.add(cpp_file_parser.get_alias_from_text('clone_into_function', clone_into_function))
+                scope.add(cpp_file_parser.Variable('clone_into_function clone_into;'))
 
     # interface-related function pointers
     class_scope.visit(AddFunctionPointers(data, scope))

@@ -10,7 +10,7 @@ import type_erasure.util
 
 def create_parser():
     parser = argparse.ArgumentParser(description='Generates handles for type-erased C++ code.')
-    parser.add_argument('--non-copyable', type=str, required=False,
+    parser.add_argument('--non-copyable', action='store_true',
                         help='set to true to generate a non-copyable interface (TODO)')
     parser.add_argument('--detail-extension', nargs='?', type=str,
                         default='Handles',

@@ -455,9 +455,10 @@ def get_function_name_for_type_erasure(function):
     args = get_function_arguments(function)
     for arg in args:
         arg_extension += '_' + arg.type()
-    arg_extension = arg_extension.replace('&', '_ref').replace('*', '_ptr').replace(' ', '_')
+    arg_extension = arg_extension.replace('&', '_ref').replace('*', '_ptr')
+    arg_extension = re.sub(' |::|\(|\)', '_', arg_extension)
     arg_extension = re.sub(r'<|>|\[|\]\(|\)\{\}', '', arg_extension)
-    arg_extension = arg_extension.replace('__','_')
+    arg_extension = re.sub('_+', '_', arg_extension)
     arg_extension = arg_extension[:-1] if arg_extension.endswith('_') else arg_extension
     if function.name == 'operator()':
         return 'call' + arg_extension
@@ -475,7 +476,7 @@ def get_function_name_for_type_erasure(function):
         return 'divide' + arg_extension
     elif function.name == 'operator==':
         return 'compare' + arg_extension
-    return function.name
+    return function.name + arg_extension
 
 
 class FunctionArgument(Tokens):
@@ -492,7 +493,16 @@ class FunctionArgument(Tokens):
         return util.concat(self.tokens[:get_name_index(self)], ' ')
 
     def decayed_type(self):
-        return self.type().replace('const ', '').replace('& ','').replace(' ','')
+        type = self.type()
+        if type.endswith('* '):
+            return type
+
+        if type.startswith('const '):
+            type = type[6:]
+        if type.endswith('& '):
+            type = type[:-2]
+
+        return type.replace(' ','')
 
     def is_rvalue(self):
         last_type_token = self.tokens[get_name_index(self) - 1]

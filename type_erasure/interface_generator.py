@@ -55,9 +55,10 @@ def add_constructors(data, scope, class_scope, detail_namespace):
                                                      code.get_handle_constructor(data, classname, detail_namespace),
                                                      cpp_file_parser.CONSTRUCTOR_TEMPLATE))
     if not data.copy_on_write or (data.table and data.copy_on_write and data.small_buffer_optimization):
-        scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
-                                                         code.get_copy_constructor(data, classname),
-                                                         cpp_file_parser.CONSTRUCTOR))
+        if not data.non_copyable:
+            scope.add(cpp_file_parser.get_function_from_text(classname, classname, '',
+                                                             code.get_copy_constructor(data, classname),
+                                                             cpp_file_parser.CONSTRUCTOR))
         scope.add( cpp_file_parser.get_function_from_text(classname, classname, '',
                                                           code.get_move_constructor(data, classname),
                                                           cpp_file_parser.CONSTRUCTOR) )
@@ -70,8 +71,9 @@ def add_operators(data, scope, classname, detail_namespace):
                                                      cpp_file_parser.FUNCTION_TEMPLATE))
 
     if not data.copy_on_write or (data.table and data.copy_on_write and data.small_buffer_optimization):
-        scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
-                                                         code.get_copy_operator(data, classname)))
+        if not data.non_copyable:
+            scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
+                                                             code.get_copy_operator(data, classname)))
 
         scope.add(cpp_file_parser.get_function_from_text(classname, 'operator=', 'return ',
                                                          code.get_move_operator(data, classname)))
@@ -248,10 +250,11 @@ class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
     def __init__(self, data, classname, detail_namespace):
         constructor = code.get_constructor_from_value_declaration(classname, detail_namespace) + ' : ' + data.function_table_member + ' ( { '
         if not data.copy_on_write:
-            constructor += '& type_erasure_table_detail :: delete_impl < ' + code.get_decayed('T') + ' > , '
-            constructor += '& type_erasure_table_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
-            if data.small_buffer_optimization:
-                constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
+            constructor += '& type_erasure_table_detail :: delete_impl < ' + code.get_decayed('T') + ' > '
+            if not data.non_copyable:
+                constructor += ', & type_erasure_table_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
+                if data.small_buffer_optimization:
+                    constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
         else:
             constructor += '& type_erasure_table_detail :: clone_into_shared_ptr < ' + code.get_decayed('T') + ' >'
             if data.small_buffer_optimization:
