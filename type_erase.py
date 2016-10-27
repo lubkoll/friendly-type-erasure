@@ -64,6 +64,9 @@ def create_parser():
     parser.add_argument('--include-dir', type=str, required=False,
                         default='',
                         help='specify an additional include directory for libclang')
+    parser.add_argument('--include-dirs', nargs='+', type=str, required=False,
+                        default=[],
+                        help='specify an additional include directory for libclang')
     parser.add_argument('--no-rtti', action='store_true',
                         help='do not use rtti, i.e. use static_cast instead of dynamic_cast')
     return parser
@@ -112,6 +115,8 @@ class Data:
         self.clang_args.extend(args.clang_args)
         self.clang_args.append('-std=' + args.std)
         self.clang_args.append('-I' + args.include_dir)
+        for dir in args.include_dirs:
+            self.clang_args.append('-I' + dir)
 
         # for file_parser, which is based on libclang
         self.current_namespaces = []
