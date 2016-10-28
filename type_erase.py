@@ -122,6 +122,7 @@ class Data:
         self.current_namespaces = []
         self.current_struct = clang.cindex.conf.lib.clang_getNullCursor()
 
+
     def get_impl_type(self, namespace, classname):
         if self.table:
             if self.copy_on_write:

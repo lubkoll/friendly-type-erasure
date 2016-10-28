@@ -1,7 +1,7 @@
+import copy
 import clang
 import clang_util
 from clang.cindex import TranslationUnit
-import util
 
 
 Break = 0
@@ -9,11 +9,28 @@ Continue = 1
 Recurse = 2
 
 
+def print_namespaces(namespaces):
+    str = ''
+    for entry in namespaces:
+        str += entry + '::'
+    print str
+
+
+class Class(object):
+    def __init__(self, classname, namespaces, filename, prefix):
+        self.name = classname
+        self.namespaces = namespaces
+        self.filename = filename
+        self.prefix = prefix
+
+
 class GenericFileParser(object):
     def __init__(self, processor, data):
         self.processor = processor
         self.data = data
         self.opened = []
+        self.open_namespaces = []
+        self.classes = []
 
     def parse(self):
         all_clang_args = self.data.clang_args
@@ -37,72 +54,93 @@ class GenericFileParser(object):
             if result == Recurse:
                 if self.visit(child) == Break:
                     return Break
+                if len(self.opened) > 0:
+                    if self.opened[-1] == 'namespace':
+                        self.parse_closing_namespaces(child, cursor)
+                        self.opened.pop()
+                        self.open_namespaces.pop()
+
             elif result == Break:
                 return Break
             elif result == Continue:
                 continue
 
     def visit_impl(self, cursor, parent):
-        if not clang.cindex.conf.lib.clang_Location_isFromMainFile(cursor.location):
-            return Continue
         try:
             kind = cursor.kind
+#            print kind
+#            print cursor.spelling
         except:
             return Break
 
-        # close open namespaces and classes
-        # when another non-nested namespace or class is opened
-        if len(self.opened) > 0:
-            if self.opened[-1] == 'namespace':
-                self.parse_closing_namespaces(parent)
-            if self.opened[-1] in ['class','struct']:
-                self.parse_closing_class(parent)
+        # process main file
+        if clang.cindex.conf.lib.clang_Location_isFromMainFile(cursor.location):
+            # close open namespaces and classes
+            # when another non-nested namespace or class is opened
+            if len(self.opened) > 0:
+                if self.opened[-1] in ['class','struct']:
+                    self.parse_closing_class(parent)
 
-#        print '\nCursor'
-#        print cursor.kind
-#        print cursor.spelling
-#        print util.concat(clang_util.get_tokens(self.data.tu, cursor),' ')
-#         print self.data.current_struct.spelling
-#         tokens = clang_util.get_tokens(self.data.tu, cursor)
-#         for token in tokens:
-#             print token.spelling
+    #        print '\nCursor'
+    #        print cursor.kind
+    #        print cursor.spelling
+    #        print util.concat(clang_util.get_tokens(self.data.tu, cursor),' ')
+    #         print self.data.current_struct.spelling
+    #         tokens = clang_util.get_tokens(self.data.tu, cursor)
+    #         for token in tokens:
+    #             print token.spelling
 
-        if clang_util.is_inclusion_directive(cursor.kind):
-            self.processor.process_inclusion_directive(self.data,cursor)
-        elif clang_util.is_access_specifier(cursor.kind):
-            self.processor.process_access_specifier(self.data,cursor)
-        elif clang_util.is_constructor(cursor.kind):
-            self.processor.process_constructor(self.data,cursor)
-        elif clang_util.is_destructor(cursor.kind):
-            self.processor.process_destructor(self.data,cursor)
-        elif clang_util.is_static_or_global_variable(cursor.kind):
-            self.processor.process_variable_declaration(self.data,cursor)
-        elif clang_util.is_member_variable(cursor.kind):
-            self.processor.process_member_variable_declaration(self.data,cursor)
-        elif clang_util.is_enum(cursor.kind):
-            self.processor.process_enum(self.data,cursor)
-        elif clang_util.is_forward_declaration(self.data.tu, cursor):
-            self.processor.process_forward_declaration(self.data,cursor)
-        elif clang_util.is_namespace(cursor.kind):
-            self.opened.append('namespace')
-            return self.parse_opening_namespace(cursor)
-        elif clang_util.is_class(cursor.kind):
-            self.opened.append('class')
-            return self.parse_opening_class(cursor)
-        elif clang_util.is_struct(cursor.kind):
-            self.opened.append('struct')
-            return self.parse_opening_class(cursor)
-        elif clang_util.is_function(cursor.kind):
-            return self.parse_function(cursor)
-        elif clang_util.is_function_template(cursor.kind):
-            self.processor.process_function_template(self.data, cursor)
-            return Continue
-        elif clang_util.is_type_alias(kind) or clang_util.is_typedef(kind):
-            self.processor.process_type_alias(self.data,cursor)
+            if clang_util.is_inclusion_directive(cursor.kind):
+                self.processor.process_inclusion_directive(self.data,cursor)
+                return Recurse
+            elif clang_util.is_access_specifier(cursor.kind):
+                self.processor.process_access_specifier(self.data,cursor)
+            elif clang_util.is_constructor(cursor.kind):
+                self.processor.process_constructor(self.data,cursor)
+            elif clang_util.is_destructor(cursor.kind):
+                self.processor.process_destructor(self.data,cursor)
+            elif clang_util.is_static_or_global_variable(cursor.kind):
+                self.processor.process_variable_declaration(self.data,cursor)
+            elif clang_util.is_member_variable(cursor.kind):
+                self.processor.process_member_variable_declaration(self.data,cursor)
+            elif clang_util.is_enum(cursor.kind):
+                self.processor.process_enum(self.data,cursor)
+            elif clang_util.is_forward_declaration(self.data.tu, cursor):
+                self.processor.process_forward_declaration(self.data,cursor)
+            elif clang_util.is_class(cursor.kind):
+                self.opened.append('class')
+                return self.parse_opening_class(cursor)
+            elif clang_util.is_struct(cursor.kind):
+                self.opened.append('struct')
+                return self.parse_opening_class(cursor)
+            elif clang_util.is_function(cursor.kind):
+                return self.parse_function(cursor)
+            elif clang_util.is_function_template(cursor.kind):
+                self.processor.process_function_template(self.data, cursor)
+            elif clang_util.is_type_alias(kind) or clang_util.is_typedef(kind):
+                self.processor.process_type_alias(self.data,cursor)
+        # process other files that are encountered through inclusion directives
+            elif clang_util.is_namespace(cursor.kind):
+                self.opened.append('namespace')
+                self.open_namespaces.append(cursor.spelling)
+                return self.parse_opening_namespace(cursor)
+        else:
+            if clang_util.is_inclusion_directive(cursor.kind):
+                return Recurse
+            elif clang_util.is_namespace(cursor.kind):
+                self.opened.append('namespace')
+                self.data.current_namespaces.append(cursor)
+                self.open_namespaces.append(cursor.spelling)
+                return Recurse
+            elif clang_util.is_class(cursor.kind) or clang_util.is_struct(cursor.kind):
+                self.classes.append(Class(copy.deepcopy(cursor.spelling),
+                                          copy.deepcopy(self.open_namespaces),
+                                          copy.deepcopy(cursor.location.file.name),
+                                          clang_util.get_class_prefix(self.data.tu, cursor)))
 
         return Continue
 
-    def parse_closing_namespaces(self,enclosing_namespace):
+    def parse_closing_namespaces(self, cursor, enclosing_namespace):
         while enclosing_namespace != self.data.tu.cursor and not clang_util.is_namespace(enclosing_namespace.kind):
             enclosing_namespace = enclosing_namespace.semantic_parent
 
@@ -110,7 +148,7 @@ class GenericFileParser(object):
             while len(self.data.current_namespaces) and \
                             enclosing_namespace != self.data.current_namespaces[-1]:
                 self.data.current_namespaces.pop()
-                self.opened.pop()
+#                if clang.cindex.conf.lib.clang_Location_isFromMainFile(cursor.location):
                 self.processor.process_close_namespace()
 
     def parse_closing_class(self,enclosing_struct):
@@ -135,9 +173,8 @@ class GenericFileParser(object):
     def parse_opening_namespace(self,cursor):
         if clang.cindex.conf.lib.clang_Location_isFromMainFile(cursor.location):
             self.processor.process_open_namespace(self.data, cursor)
-            self.data.current_namespaces.append(cursor)
-            return Recurse
-        return Continue
+        self.data.current_namespaces.append(cursor)
+        return Recurse
 
     def parse_opening_class(self,cursor):
         if self.data.current_struct == clang.cindex.conf.lib.clang_getNullCursor():
