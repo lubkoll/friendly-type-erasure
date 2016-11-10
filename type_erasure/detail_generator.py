@@ -64,4 +64,4 @@ def write_file(data):
     cpp_file_parser.remove_duplicate_inclusion_directives(scope)
     if data.table:
         scope.visit(table_detail.SortTable())
-    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file), to_string.Visitor(short_entries=[cpp_file_parser.ALIAS]), not data.no_warning_header)
+    to_string.write_scope(scope, os.path.join(data.detail_folder,data.detail_file), to_string.Visitor(short_entries=[cpp_file_parser.ALIAS]), not data.no_warning_header, True)
