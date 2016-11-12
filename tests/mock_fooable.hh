@@ -40,7 +40,7 @@ namespace Mock
     struct MockLargeFooable : MockFooable
     {
     private:
-        std::array<double,1024> buffer_;
+        std::array<char,1024> buffer_;
     };
 }
 

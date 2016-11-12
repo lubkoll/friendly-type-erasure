@@ -104,7 +104,7 @@ def add_private_section(data, scope, detail_namespace, classname):
                                                          code.get_read_function(data, const_return_type,
                                                                                 data.impl_member)))
         scope.add(cpp_file_parser.get_function_from_text(classname, 'write', 'return ',
-                                                         code.get_write_function(data, return_type, data.impl_member)))
+                                                         code.get_write_function(data, return_type)))
 
     function_table_var = detail_namespace + '::' + data.function_table_type + '<' + classname
     if data.small_buffer_optimization:

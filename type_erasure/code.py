@@ -2,7 +2,9 @@ import cpp_file_parser
 import parser_addition
 import util
 
-
+####################################################################
+# Apply std::decay
+####################################################################
 def get_decayed(type_):
     return 'typename std :: decay < ' + type_ + ' > :: type'
 
@@ -126,7 +128,9 @@ def get_copy_constructor_for_table(data, classname):
         declaration += ', type_id_ ( other . type_id_ ) '
     if data.small_buffer_optimization:
         if data.copy_on_write:
-            return declaration + ', ' + data.impl_member + ' ( other . ' + data.impl_member + ' ) { }'
+            declaration += ', ' + data.impl_member + ' ( other . ' + data.impl_member + ' ) { '
+            declaration += 'if ( !type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' . get ( ) , other . buffer_ ) ) '
+            return declaration + 'other . functions_ . clone_into ( other . impl_ . get ( ) , buffer_ , impl_ ) ; }'
         else:
             return declaration + '{ ' + data.impl_member + ' = other . clone_into ( buffer_ ) ; }'
     else:
@@ -232,6 +236,8 @@ def get_copy_operator_for_table(data, classname):
     if data.small_buffer_optimization:
         if data.copy_on_write:
             declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
+            declaration += 'if ( !type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' . get ( ) , other . buffer_ ) ) '
+            declaration += 'other . functions_ . clone_into ( other . impl_ . get ( ) , buffer_ , impl_ ) ; '
         else:
             declaration += data.impl_member + ' = other . clone_into ( buffer_ ) ; '
     else:
@@ -284,6 +290,9 @@ def get_move_operator(data, classname):
         else get_move_operator_for_handle(data, classname)
 
 
+####################################################################
+# Explicit operator bool
+####################################################################
 def get_operator_bool_for_member_ptr(member):
     return 'explicit operator bool ( ) const noexcept { return ' + member + ' != nullptr ; }'
 
@@ -296,28 +305,31 @@ def get_operator_bool_comment(declaration):
     return parser_addition.Comment(comment, declaration)
 
 
+####################################################################
+# Casts via member function target
+####################################################################
 def get_cast(data, classname, handle_namespace, const=''):
     const = const and const + ' ' or ''
     declaration = 'template < class T > ' + const + 'T * target ( ) ' + const + 'noexcept '
+    impl = ('read ( )' if const else 'write ( )') if data.copy_on_write else data.impl_raw_member
 
     if data.table:
         if data.no_rtti:
-            declaration += '{ return type_erasure_table_detail :: cast_impl < T > ( '
-            declaration += 'read ( )' if data.copy_on_write else data.impl_raw_member
-            return declaration + ' ) ; }'
+            code = declaration + '{ if ( ! ' + data.impl_member + ' ) return nullptr ; '
+            return code + 'return type_erasure_table_detail :: cast_impl < T > ( ' + impl + ' ) ; }'
         else:
-            declaration += '{ return type_erasure_table_detail :: dynamic_cast_impl < T > ( type_id_ , '
-            declaration += 'read ( )' if data.copy_on_write else data.impl_raw_member
-            return declaration + ' ) ; }'
+            code = declaration + '{ if ( ! ' + data.impl_member + ' ) return nullptr ; '
+            return code + 'return type_erasure_table_detail :: dynamic_cast_impl < T > ( type_id_ , ' + impl + ' ) ; }'
     else:
+        impl = impl if not data.copy_on_write else '& ' + impl
         if data.small_buffer_optimization:
             return declaration + '{ if ( type_erasure_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) ' \
                                  'return type_erasure_detail :: cast < ' + const + 'T , ' + \
-                                 const + 'HeapAllocatedHandle < T > > ( ' + data.impl_raw_member + ' ) ; ' \
+                                 const + 'HeapAllocatedHandle < T > > ( ' + impl + ' ) ; ' \
                                 'return type_erasure_detail :: cast < ' + const + 'T , ' + \
-                                 const + 'StackAllocatedHandle < T > > ( ' + data.impl_raw_member + ' ) ; }'
+                                 const + 'StackAllocatedHandle < T > > ( ' + impl + ' ) ; }'
     return declaration + '{ return type_erasure_detail :: cast < ' + const + 'T , ' + \
-           const + handle_namespace + ' :: Handle < T , ' + classname + ' > > ( ' + data.impl_raw_member + ' ) ; }'
+           const + handle_namespace + ' :: Handle < T , ' + classname + ' > > ( ' + impl + ' ) ; }'
 
 
 def get_handle_cast_comment(declaration, const=''):
@@ -339,6 +351,9 @@ def get_handle_interface_function(data, function):
     return code + ' ) ; }'
 
 
+####################################################################
+# Handle specialization for std::reference_wrapper
+####################################################################
 def get_handle_specialization(data):
     if data.small_buffer_optimization:
         return 'template < class T , class Interface , class Buffer , bool HeapAllocated > ' \
@@ -351,6 +366,9 @@ def get_handle_specialization(data):
            'Handle ( std :: reference_wrapper < T > ref ) noexcept : Handle < T & , Interface > ( ref . get ( ) ) { } } ;'
 
 
+####################################################################
+# Copy-on-write: read
+####################################################################
 def get_read_function_for_handle(return_type, member):
     return return_type + ' read ( ) const noexcept { assert ( ' + member + ' ) ; ' \
                                          'return * ' + member + ' ; }'
@@ -365,29 +383,35 @@ def get_read_function(data, return_type, member):
         else get_read_function_for_handle(return_type, member)
 
 
-def get_write_function_for_handle(data, return_type, member):
-    code = return_type + ' write ( ) { assert ( ' + member + ' ) ; if ( ! ' + member + ' . unique ( ) ) '
+########################################
+# Copy-on-write: write
+########################################
+def get_write_function_for_handle(data, return_type):
+    code = return_type + ' write ( ) { assert ( ' + data.impl_member + ' ) ; '
+    code += 'if ( ! ' + data.impl_member + ' . unique ( ) '
     if data.small_buffer_optimization:
-        code += member + ' = ' + member + ' -> clone_into ( buffer_ ) ; '
-    else:
-        code += member + ' = ' + member + ' -> clone ( ) ; '
-    return code + 'return * ' + member + ' ; }'
-
-
-def get_write_function_for_table(data, return_type, member):
-    code = return_type + ' write ( ) { if ( ! ' + member + ' . unique ( ) ) '
+        code += '&& type_erasure_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) '
+    code += ') '
     if data.small_buffer_optimization:
-        code += '{ if ( type_erasure_table_detail :: is_heap_allocated ( ' + member + ' . get ( ) , buffer_ ) ) '
-        code += data.function_table_member + ' . clone( ' + member + ' . get ( ) , ' + member + ' ) ; '
-        code += 'else ' + data.function_table_member + ' . clone_into ( ' + member + ' . get ( ) , buffer_ , ' + member + ' ) ; }'
+        code += data.impl_member + ' = ' + data.impl_member + ' -> clone_into ( buffer_ ) ; '
     else:
-        code += data.function_table_member + ' . clone ( read ( ) , ' + member + ' ) ; '
-    return code + 'return ' + member + ' . get ( ) ; }'
+        code += data.impl_member + ' = ' + data.impl_member + ' -> clone ( ) ; '
+    return code + 'return * ' + data.impl_member + ' ; }'
 
 
-def get_write_function(data, return_type, member):
-    return get_write_function_for_table(data, return_type, member) if data.table \
-        else get_write_function_for_handle(data, return_type, member)
+def get_write_function_for_table(data, return_type):
+    code = return_type + ' write ( ) { assert ( ' + data.impl_member + ' ) ; '
+    code += 'if ( ! ' + data.impl_member + ' . unique ( ) '
+    if data.small_buffer_optimization:
+        code += '&& type_erasure_table_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) '
+    code += ') '
+    code += data.function_table_member + ' . clone ( read ( ) , ' + data.impl_member + ' ) ; '
+    return code + 'return read ( ) ; }'
+
+
+def get_write_function(data, return_type):
+    return get_write_function_for_table(data, return_type) if data.table \
+        else get_write_function_for_handle(data, return_type)
 
 
 def get_single_function_call(function):

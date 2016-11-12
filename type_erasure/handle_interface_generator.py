@@ -122,7 +122,7 @@ def add_private_section(data, scope, detail_namespace, classname):
                                                          code.get_read_function(data, const_return_type,
                                                                                 data.impl_member)))
         scope.add(cpp_file_parser.get_function_from_text(classname, 'write', 'return ',
-                                                         code.get_write_function(data, return_type, data.impl_member)))
+                                                         code.get_write_function(data, return_type)))
 
     if data.small_buffer_optimization and not data.copy_on_write:
         reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' ) ' + data.impl_member + ' -> destroy ( ) ; }'
