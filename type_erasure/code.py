@@ -194,7 +194,7 @@ def get_move_constructor_for_table(data, classname):
             declaration += 'else other . ' + data.function_table_member + ' . clone_into ( other . ' + data.impl_member + ' . get ( ) , '
             return declaration + ' buffer_ , ' + data.impl_member + ' ) ; other . ' + data.impl_member + ' = nullptr ; }'
         else:
-            declaration += '{ if ( ! other . ' + data.impl_member + ' ) { reset ( ) ; ' + data.impl_member + ' = nullptr ; return ; } '
+            declaration += '{ if ( ! other . ' + data.impl_member + ' ) { ' + data.impl_member + ' = nullptr ; return ; } '
             declaration += 'if ( type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
             declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '
             declaration += 'else { buffer_ = std :: move ( other . buffer_ ) ; ' + data.impl_member + ' = & buffer_ ; } '
@@ -230,6 +230,8 @@ def get_copy_operator_for_handle(data, classname):
 
 def get_copy_operator_for_table(data, classname):
     declaration = classname + ' & operator = ( const ' + classname + ' & other ) { '
+    if not data.copy_on_write:
+        declaration += 'reset ( ) ; '
     declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
     if not data.no_rtti:
         declaration += 'type_id_ = other . type_id_ ; '
@@ -253,6 +255,8 @@ def get_copy_operator(data, classname):
 
 def get_move_operator_for_table(data, classname):
     declaration = classname + ' & operator = ( ' + classname + ' && other ) noexcept { '
+    if not data.copy_on_write:
+        declaration += 'reset ( ) ; '
     if not data.no_rtti:
         declaration += 'type_id_ = other . type_id_ ; '
     if data.small_buffer_optimization:
@@ -263,7 +267,7 @@ def get_move_operator_for_table(data, classname):
             declaration +='else other . ' + data.function_table_member + ' . clone_into ( other . ' + data.impl_member + ' . get ( ) , '
             declaration += 'buffer_ , ' + data.impl_member + ' ) ;'
         else:
-            declaration += 'if ( ! other . ' + data.impl_member + ' ) { reset ( ) ; ' + data.impl_member + ' = nullptr ; return * this ; } '
+            declaration += 'if ( ! other . ' + data.impl_member + ' ) { ' + data.impl_member + ' = nullptr ; return * this ; } '
             declaration += data.function_table_member + ' = other . ' + data.function_table_member + ' ; '
             declaration += 'if ( type_erasure_table_detail :: is_heap_allocated ( other . ' + data.impl_member + ' , other . buffer_ ) ) '
             declaration += data.impl_member + ' = other . ' + data.impl_member + ' ; '

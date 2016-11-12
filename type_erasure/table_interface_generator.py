@@ -84,7 +84,6 @@ def add_default_interface(data, scope, class_scope, detail_namespace):
     scope.add( cpp.public_access )
     add_constructors(data, scope, class_scope, detail_namespace)
     if not data.copy_on_write:
-        if data.small_buffer_optimization:
             destructor = '~ ' + classname + ' ( ) { reset ( ) ; }'
             scope.add( cpp_file_parser.get_function_from_text(classname, '~'+classname, '',
                                                                  destructor, 'destructor'))
@@ -117,12 +116,15 @@ def add_private_section(data, scope, detail_namespace, classname):
         scope.add(cpp.Variable('std::shared_ptr<void> ' + data.impl_member + ' = nullptr;'))
     else:
         scope.add(cpp.Variable('void* ' + data.impl_member + ' = nullptr;'))
-    if data.small_buffer_optimization and not data.copy_on_write:
-        reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' && type_erasure_table_detail :: is_heap_allocated ' \
-                '( ' + data.impl_raw_member + ' , buffer_ ) ) ' + data.function_table_member + ' . del ( ' + data.impl_member + ' ) ; }'
+
+    if not data.copy_on_write:
+        reset = 'void reset ( ) noexcept { if ( ' + data.impl_member + ' '
+        if data.small_buffer_optimization:
+            reset += ' && type_erasure_table_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) '
+        reset += ') ' + data.function_table_member + ' . del ( ' + data.impl_raw_member + ' ) ; }'
         scope.add(cpp_file_parser.get_function_from_text(classname, 'reset', '', reset))
 
-        if not data.non_copyable:
+        if not data.non_copyable and data.small_buffer_optimization:
             clone_into = 'void * clone_into ( Buffer & buffer ) const { if ( ! ' + data.impl_member + ' ) return nullptr ; '
             clone_into += 'if ( type_erasure_table_detail :: is_heap_allocated ( ' + data.impl_raw_member + ' , buffer_ ) ) '
             clone_into += 'return ' + data.function_table_member + ' . clone ( ' + data.impl_member + ' ) ; else '
@@ -197,16 +199,16 @@ def get_private_base_class(classname, data):
 class TableConstructorExtractor(cpp_file_parser.RecursionVisitor):
     def __init__(self, data, classname, detail_namespace):
         constructor = code.get_constructor_from_value_declaration(classname, detail_namespace) + ' : ' + data.function_table_member + ' ( { '
-        if not data.copy_on_write:
+        if data.copy_on_write:
+            constructor += '& type_erasure_table_detail :: clone_into_shared_ptr < ' + code.get_decayed('T') + ' >'
+            if data.small_buffer_optimization:
+                constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
+        else:
             constructor += '& type_erasure_table_detail :: delete_impl < ' + code.get_decayed('T') + ' > '
             if not data.non_copyable:
                 constructor += ', & type_erasure_table_detail :: clone_impl < ' + code.get_decayed('T') + ' >'
                 if data.small_buffer_optimization:
                     constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
-        else:
-            constructor += '& type_erasure_table_detail :: clone_into_shared_ptr < ' + code.get_decayed('T') + ' >'
-            if data.small_buffer_optimization:
-                constructor += ' , & type_erasure_table_detail :: clone_into_buffer < ' + code.get_decayed('T') + ' , Buffer >'
         self.constructor = constructor
         self.classname = classname
 
