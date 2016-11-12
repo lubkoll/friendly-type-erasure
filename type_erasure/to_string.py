@@ -1,5 +1,6 @@
-import util
+import cpp
 import cpp_file_parser
+import util
 
 
 class Visitor(cpp_file_parser.Visitor):
@@ -10,7 +11,7 @@ class Visitor(cpp_file_parser.Visitor):
         return str(visited) + '\n'
 
     def visit_alias(self,alias):
-        return util.concat(alias.tokens, ' ') + '\n' + ('' if cpp_file_parser.ALIAS in self.short_entries else '\n')
+        return util.concat(alias.tokens, ' ') + '\n' + ('' if cpp.ALIAS in self.short_entries else '\n')
 
     def visit_class(self,class_object):
         code = ''
@@ -25,13 +26,13 @@ class Visitor(cpp_file_parser.Visitor):
         for entry in class_object.content:
             code += entry.visit(self)
         code += '};\n'
-        return code + ('' if cpp_file_parser.CLASS in self.short_entries else '\n')
+        return code + ('' if cpp.CLASS in self.short_entries else '\n')
 
     def visit_template_class(self,template_class):
         code = util.concat(template_class.tokens,' ') + '{ '
         for entry in template_class.content:
             code += entry.visit(self)
-        return code + '};\n' + ('' if cpp_file_parser.CLASS_TEMPLATE in self.short_entries else '\n')
+        return code + '};\n' + ('' if cpp.CLASS_TEMPLATE in self.short_entries else '\n')
 
     def visit_namespace(self,namespace):
         str = ''
@@ -41,10 +42,10 @@ class Visitor(cpp_file_parser.Visitor):
             str += entry.visit(self)
         if namespace.name != 'global':
             str += '}'
-        return str + ('' if cpp_file_parser.NAMESPACE in self.short_entries else '\n')
+        return str + ('' if cpp.NAMESPACE in self.short_entries else '\n')
 
     def visit_inclusion_directive(self,inclusion_directive):
-        return '#include ' + inclusion_directive.value + ('' if cpp_file_parser.INCLUSION_DIRECTIVE in self.short_entries else '\n')
+        return '#include ' + inclusion_directive.value + ('' if cpp.INCLUSION_DIRECTIVE in self.short_entries else '\n')
 
     def visit_access_specifier(self,access_specifier):
         return access_specifier.value + ':\n'
@@ -62,10 +63,10 @@ class VisitorForHeaderFile(Visitor):
 
     def visit_function(self, function):
         code = function.get_declaration() + ';\n'
-        return code + ('' if cpp_file_parser.FUNCTION in self.short_entries else '\n')
+        return code + ('' if cpp.FUNCTION in self.short_entries else '\n')
 
     def visit_template_function(self, function):
-       return function.get_in_place_definition() + ('' if cpp_file_parser.FUNCTION_TEMPLATE in self.short_entries else '\n')
+       return function.get_in_place_definition() + ('' if cpp.FUNCTION_TEMPLATE in self.short_entries else '\n')
 
     def visit_namespace(self, namespace):
         code = ''
@@ -77,7 +78,7 @@ class VisitorForHeaderFile(Visitor):
             code += entry.visit(self)
         if namespace.name != 'global':
             code += '}'
-        return code + ('' if cpp_file_parser.NAMESPACE in self.short_entries else '\n')
+        return code + ('' if cpp.NAMESPACE in self.short_entries else '\n')
 
     def visit_comment(self,comment):
         first_line = comment.value.comment[0]
@@ -105,7 +106,7 @@ class VisitorForSourceFile(Visitor):
                     token.spelling = alias
 
     def visit_function(self, function):
-        if cpp_file_parser.is_deleted(function) or cpp_file_parser.is_defaulted(function) or cpp_file_parser.is_constexpr(function):
+        if cpp.is_deleted(function) or cpp.is_defaulted(function) or cpp.is_constexpr(function):
             return ''
 
         self.add_class_prefix_for_nested_types(function)
@@ -141,12 +142,12 @@ class VisitorForSourceFile(Visitor):
         return ''
 
     def visit_class(self,class_):
-        if cpp_file_parser.is_forward_declaration(class_):
+        if cpp.is_forward_declaration(class_):
             return util.concat(class_.tokens, ' ')
         str = ''
         self.current_class = class_.get_name( )
         for entry in class_.content:
-            if entry.type == cpp_file_parser.ALIAS:
+            if entry.type == cpp.ALIAS:
                 self.current_class_aliases.append(entry.name)
 
         for entry in class_.content:

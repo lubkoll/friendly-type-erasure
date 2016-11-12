@@ -2,8 +2,9 @@
 
 import code
 import copy
-import util
+import cpp
 import cpp_file_parser
+import util
 
 
 class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
@@ -13,17 +14,17 @@ class PureVirtualFunctionExtractor(cpp_file_parser.RecursionVisitor):
 
     def visit_function(self,function_):
         function = copy.deepcopy(function_)
-        tokens = function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)]
-        index, offset = cpp_file_parser.find_function_name(function.name, tokens)
+        tokens = function.tokens[:cpp.get_declaration_end_index(function.name, function.tokens)]
+        index, offset = cpp.find_function_name(function.name, tokens)
         cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, tokens[:index])
         function_name = cpp_file_parser.get_function_name_for_type_erasure(function)
         code = util.concat(tokens[:index], ' ') + function_name + ' ( '
         cpp_file_parser.replace_in_tokens(function.classname, 'HandleBase', tokens[index:])
         code += cpp_file_parser.const_specifier(function) + self.data.interface_type + ' & '
-        for arg in cpp_file_parser.get_function_arguments(function):
+        for arg in cpp.get_function_arguments(function):
             code += ' , ' + arg.in_declaration()
-        code += util.concat(tokens[cpp_file_parser.get_arguments_end_index(function.name, tokens):
-                            cpp_file_parser.get_declaration_end_index(function.name, tokens)], ' ')
+        code += util.concat(tokens[cpp.get_arguments_end_index(function.name, tokens):
+        cpp.get_declaration_end_index(function.name, tokens)], ' ')
         if not code.startswith('virtual '):
             code = 'virtual ' + code
         if not code.endswith('= 0'):
@@ -53,7 +54,7 @@ def add_handle_base(data, scope, class_scope):
     if data.small_buffer_optimization:
         handle_base += ', class Buffer '
     handle_base += '> struct HandleBase'
-    scope.add(cpp_file_parser.get_template_struct_from_text(classname, handle_base))
+    scope.add(cpp.get_template_struct_from_text(classname, handle_base))
 
     destructor = 'virtual ~ ' + classname + ' ( ) = default ;'
     scope.add( cpp_file_parser.get_function_from_text(classname, '~' + classname, '', destructor, 'destructor') )
@@ -70,19 +71,19 @@ def add_handle_base(data, scope, class_scope):
 class OverridingFunctionExtractor(PureVirtualFunctionExtractor):
     def visit_function(self,function_):
         function = copy.deepcopy(function_)
-        tokens = function.tokens[:cpp_file_parser.get_declaration_end_index(function.name, function.tokens)]
-        index, offset = cpp_file_parser.find_function_name(function.name, function.tokens)
+        tokens = function.tokens[:cpp.get_declaration_end_index(function.name, function.tokens)]
+        index, offset = cpp.find_function_name(function.name, function.tokens)
         cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, tokens[:index])
         function_name = cpp_file_parser.get_function_name_for_type_erasure(function)
         code = util.concat(tokens[:index], ' ') + function_name + ' ( '
         cpp_file_parser.replace_in_tokens(function.classname, 'HandleBase', tokens[index:])
         code += cpp_file_parser.const_specifier(function) + self.data.interface_type + ' & ' + self.data.interface_variable + ' '
-        for arg in cpp_file_parser.get_function_arguments(function):
+        for arg in cpp.get_function_arguments(function):
             if 'HandleBase' in arg.type():
                 cpp_file_parser.replace_in_tokens('HandleBase', self.data.handle_base_type, arg.tokens)
             code += ' , ' + arg.in_declaration()
-        code += util.concat(tokens[cpp_file_parser.get_arguments_end_index(function.name, tokens):
-        cpp_file_parser.get_declaration_end_index(function.name, tokens)], ' ')
+        code += util.concat(tokens[cpp.get_arguments_end_index(function.name, tokens):
+        cpp.get_declaration_end_index(function.name, tokens)], ' ')
 
         if code.startswith('virtual '):
             code = code[len('virtual '):]
@@ -96,7 +97,7 @@ class OverridingFunctionExtractor(PureVirtualFunctionExtractor):
             code += function.return_str
         code += 'value_ . ' + function.name + ' ( '
 
-        arguments = cpp_file_parser.get_function_arguments(function)
+        arguments = cpp.get_function_arguments(function)
         for arg in arguments:
             if arg.type() == 'const HandleBase & ':
                 code += 'static_cast < ' + 'const ' + self.data.handle_type + ' & > ( '
@@ -115,7 +116,7 @@ class OverridingFunctionExtractor(PureVirtualFunctionExtractor):
         code += ' }'
 
         self.scope.add(cpp_file_parser.get_function_from_text(function.classname, function_name,
-                                                              function.return_str, code))
+                                                  function.return_str, code))
 
 
 def add_overriding_functions(data, scope, classname):
@@ -163,15 +164,15 @@ def add_handle(data, scope, class_scope):
         handle += ', class Buffer, bool HeapAllocated > struct Handle : HandleBase < Interface , Buffer >'
     else:
         handle += ' > struct Handle : HandleBase < Interface >'
-    scope.add(cpp_file_parser.get_template_struct_from_text(classname, handle))
+    scope.add(cpp.get_template_struct_from_text(classname, handle))
 
     add_handle_constructors(scope)
     add_overriding_functions(data, scope, classname)
 
     class_scope.visit(OverridingFunctionExtractor(data, scope))
-    scope.add( cpp_file_parser.ScopeEntry('variable', 'T value_;') )
+    scope.add( cpp.ScopeEntry('variable', 'T value_;') )
 
     scope.close()
 
     # template specialization for std::reference_wrapper
-    scope.add( cpp_file_parser.ScopeEntry('code fragment', code.get_handle_specialization(data)))
+    scope.add( cpp.ScopeEntry('code fragment', code.get_handle_specialization(data)))
