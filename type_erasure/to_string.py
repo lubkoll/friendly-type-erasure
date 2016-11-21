@@ -166,7 +166,7 @@ def write_scope(scope, filename, visitor=Visitor(), write_warning_header=True, h
     if write_warning_header:
         file.write(util.do_not_overwrite_text)
     if hide_from_doxygen:
-        file.write('// @cond\n')
+        file.write('// @cond TYPE_ERASURE_DETAIL\n')
     file.write(scope.visit(visitor))
     if hide_from_doxygen:
         file.write('//@endcond\n')

@@ -1,5 +1,7 @@
 #pragma once
 
+// @cond TYPE_ERASURE_DETAIL
+
 #include <cassert>
 #include <cstddef>
 #include <memory>
@@ -94,3 +96,5 @@ namespace type_erasure_detail
                handle_ptr<HandleBase>( char_ptr(&buffer) + sizeof(buffer) ) <= handle;
     }
 }
+
+// @endcond
