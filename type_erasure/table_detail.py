@@ -33,10 +33,16 @@ class AddFunctionPointers(cpp_file_parser.RecursionVisitor):
 
         function_pointer_alias_definition = 'using ' + function_pointer_alias + ' = '
         index, offset = cpp.find_function_name(function.name, function.tokens)
-        cpp_file_parser.replace_in_tokens(function.classname, 'Interface', function.tokens[:index])
+        returns_self = util.contains(function.tokens[:index], function.classname)
+        returns_self_by_reference = cpp.contains_sequence(function.tokens[:index], [cpp.SimpleToken(function.classname), cpp.SimpleToken('&')])
+        if returns_self:
+            cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, function.tokens[:index])
         function_pointer_alias_definition += util.concat(function.tokens[:index], ' ')
-        interface_type = ('const ' if cpp.is_const(function) else '') + self.data.interface_type + ' &'
-        function_pointer_alias_definition += '( * ) ( ' + interface_type + ' , void * '
+        function_pointer_alias_definition += '( * ) ( '
+        if returns_self_by_reference:
+            interface_type = ('const ' if cpp.is_const(function) else '') + self.data.interface_type + ' &'
+            function_pointer_alias_definition += interface_type + ' , '
+        function_pointer_alias_definition += 'void * '
 
         arguments = cpp.get_function_arguments(function)
         adjust_table_arguments_tokens(function.classname, arguments)
@@ -65,12 +71,17 @@ class AddFunctionWrappers(cpp_file_parser.RecursionVisitor):
         function = copy.deepcopy(function_)
         name = cpp_file_parser.get_function_name_for_type_erasure(function)
         index, offset = cpp.find_function_name(function.name, function.tokens)
-        cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, function.tokens[:index])
+        returns_self = util.contains(function.tokens[:index], function.classname)
+        returns_self_by_reference = cpp.contains_sequence(function.tokens[:index],
+                                                          [cpp.SimpleToken(function.classname), cpp.SimpleToken('&')])
+        if returns_self:
+            cpp_file_parser.replace_in_tokens(function.classname, self.data.interface_type, function.tokens[:index])
         arguments = copy.deepcopy(cpp.get_function_arguments(function))
 
-        wrapper = 'static ' + cpp_file_parser.get_table_return_type(function)
-        wrapper += name + ' ( ' +  cpp_file_parser.const_specifier(function) + self.data.interface_type + ' & ' + \
-                   self.data.interface_variable + ' , '
+        wrapper = 'static ' + util.concat(function.tokens[:index], ' ')
+        wrapper += name + ' ( '
+        if returns_self_by_reference:
+            wrapper += cpp_file_parser.const_specifier(function) + self.data.interface_type + ' & ' + self.data.interface_variable + ' , '
         wrapper += ' void * impl '
         for arg in arguments:
             if cpp_file_parser.contains(function.classname, arg.tokens):

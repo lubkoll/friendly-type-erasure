@@ -46,6 +46,13 @@ def concat(tokens,spacing=''):
     return str
 
 
+def contains(tokens, word):
+    for token in tokens:
+        if token.spelling == word:
+            return True
+    return False
+
+
 def clang_format(filename):
     formatter_file = os.path.join(os.path.dirname(__file__), 'formatting.txt')
     line = trim(open(formatter_file, 'r').readline().replace('filename', filename))

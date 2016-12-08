@@ -293,10 +293,10 @@ class Alias(Tokens):
 def contains_sequence(tokens, sub_tokens):
     if len(sub_tokens) > len(tokens):
         return False
-    for offset in range(len(tokens) - len(sub_tokens)):
+    for offset in range(len(tokens) - len(sub_tokens) + 1):
         found_sequence = True
         for index in range(len(sub_tokens)):
-            if sub_tokens[index] != tokens[offset + index]:
+            if sub_tokens[index].spelling != tokens[offset + index].spelling:
                 found_sequence = False
         if found_sequence:
             return True

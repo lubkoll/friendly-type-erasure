@@ -254,13 +254,19 @@ class WrapperFunctionExtractor(HandleFunctionExtractor):
         super(WrapperFunctionExtractor,self).__init__(data, scope)
 
     def visit_function(self,function):
+        index, offset = cpp.find_function_name(function.name, function.tokens)
+#        returns_self = cpp.contains_sequence(function.tokens[:index], [cpp.SimpleToken(function.classname), cpp.SimpleToken('&')])
+        returns_self_by_reference = cpp.contains_sequence(function.tokens[:index], [cpp.SimpleToken(function.classname), cpp.SimpleToken('&')])
         member = self.data.impl_const_access if cpp.is_const(function) else self.data.impl_access
         if self.in_private_section:
             return
         code = function.get_declaration()
         code += '{ assert ( ' + self.data.impl_member + ' ) ; '
         code += function.return_str + self.data.function_table_member + ' . ' + cpp_file_parser.get_function_name_for_type_erasure(function)
-        code += ' ( * this , ' + member + ' '
+        code += ' ( '
+        if returns_self_by_reference:
+            code += '* this , '
+        code += member + ' '
         arguments = cpp.get_function_arguments(function)
         for arg in arguments:
             code += ' , '
